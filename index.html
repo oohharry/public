@@ -24,8 +24,13 @@ header{height:70px;display:flex;align-items:center;justify-content:space-between
 
 main{flex:1;display:flex;min-height:0}
 .left{width:280px;background:linear-gradient(180deg, rgba(8,20,40,.8), rgba(3,6,16,.9));padding:15px;border-right:1px solid rgba(90,170,255,.2);overflow-y:auto;backdrop-filter:blur(5px)}
+/* 隐藏左侧和右侧滚动条，防变形 */
+.left::-webkit-scrollbar, .right::-webkit-scrollbar { display: none; }
+.left, .right { -ms-overflow-style: none; scrollbar-width: none; }
+
 .left h3{margin-bottom:15px;font-size:16px;text-align:center;color:#00f2fe;letter-spacing:2px;text-shadow:0 0 10px rgba(0,242,254,.5)}
-.winner-item{background:linear-gradient(90deg,rgba(0,242,254,.15),rgba(10,20,40,.4));padding:10px;margin-bottom:8px;border-radius:6px;border-left:3px solid #00f2fe;display:flex;justify-content:space-between;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.winner-item{background:linear-gradient(90deg,rgba(0,242,254,.15),rgba(10,20,40,.4));padding:10px;margin-bottom:8px;border-radius:6px;border-left:3px solid #00f2fe;display:flex;justify-content:space-between;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.3);animation: slideIn 0.3s ease-out;}
+@keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 .winner-item span{color:#8fb8e0}
 .winner-item b{color:#ffd700;text-shadow:0 0 8px rgba(255,215,0,.5)}
 
@@ -37,7 +42,7 @@ canvas{display:block;width:100%;height:100%}
 .prize-btn{padding:14px;border-radius:8px;border:1px solid rgba(0,242,254,.2);background:rgba(15,30,55,.7);cursor:pointer;text-align:center;font-size:16px;font-weight:bold;transition:.3s;position:relative;overflow:hidden}
 .prize-btn:not(.done):hover{border-color:#00f2fe;box-shadow:0 0 15px rgba(0,242,254,.4)}
 .prize-btn.active{border-color:#ffd700;background:rgba(60,50,10,.6);box-shadow:0 0 20px rgba(255,215,0,.4);color:#ffd700;text-shadow:0 0 10px rgba(255,215,0,.5)}
-.prize-btn.done{opacity:.3;cursor:not-allowed;filter:grayscale(1)}
+.prize-btn.done{opacity:.2;cursor:not-allowed;filter:grayscale(1)}
 .batch-row{display:flex;align-items:center;justify-content:space-between;font-size:15px;color:#bfe0ff;margin-top:10px;padding:10px 0;border-top:1px solid rgba(90,170,255,.2)}
 .batch-row input{width:60px;height:34px;border-radius:6px;border:1px solid rgba(0,242,254,.3);background:#07111f;color:#00f2fe;font-size:18px;font-weight:bold;text-align:center;outline:none}
 .controls{display:flex;flex-direction:column;gap:12px;margin-top:auto}
@@ -272,7 +277,6 @@ if (isJoinMode) {
   loadData();
   initComm();
 
-  // 音乐控制
   const bgm = $('bgm');
   bgm.volume = 0.2;
   let isBgmPlaying = false;
@@ -287,7 +291,7 @@ if (isJoinMode) {
   $('showQrBtn').onclick = () => $('qrModal').style.display = 'flex';
   $('qrModal').onclick = () => $('qrModal').style.display = 'none';
 
-  // --- Canvas 3D 球体与粒子特效引擎 ---
+  // --- Canvas 引擎 ---
   const canvas = $('stage');
   const ctx = canvas.getContext('2d');
   let W, H, cx, cy, R, dpr;
@@ -296,7 +300,6 @@ if (isJoinMode) {
   let state = 'idle'; 
   let currentPrizeId = null;
   let centerWinners = []; 
-  let showTimer = 0;
   
   const MAX = 400;
 
@@ -308,7 +311,6 @@ if (isJoinMode) {
       const theta = Math.PI * (3 - Math.sqrt(5)) * i;
       slots.push({ bx: Math.cos(theta) * r, by: y, bz: Math.sin(theta) * r, name: null });
     }
-    // 初始化背景星空
     bgStars = [];
     for(let i=0; i<100; i++) {
       bgStars.push({
@@ -330,9 +332,8 @@ if (isJoinMode) {
   }
   window.addEventListener('resize', resize);
 
-  // 爆炸粒子
   function createSparks(x, y, color = '#00f2fe') {
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 80; i++) {
       const angle = Math.random() * Math.PI * 2;
       const spd = Math.random() * 10 + 3;
       sparks.push({
@@ -346,13 +347,11 @@ if (isJoinMode) {
     speed += (targetSpeed - speed) * Math.min(1, dt * 2.2);
     rotY += speed * dt;
 
-    // 更新星空
     bgStars.forEach(s => {
       s.y -= s.speed;
       if (s.y < 0) { s.y = H; s.x = Math.random() * W; }
     });
 
-    // 更新粒子
     for (let i = sparks.length - 1; i >= 0; i--) {
       const p = sparks[i];
       p.x += p.vx; p.y += p.vy;
@@ -366,14 +365,11 @@ if (isJoinMode) {
       const f = flyers[i];
       if (now < f.startAt) continue;
       const t = Math.min(1, (now - f.startAt) / f.duration);
-      
-      // 缓动：先快后慢，带一点回弹
       const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       
       const nx = (1-e)*(1-e)*f.start.x + 2*(1-e)*e*f.cp.x + e*e*f.end.x;
       const ny = (1-e)*(1-e)*f.start.y + 2*(1-e)*e*f.cp.y + e*e*f.end.y;
       
-      // 记录轨迹（彗星尾巴）
       if (!f.trail) f.trail = [];
       f.trail.push({x: nx, y: ny});
       if (f.trail.length > 25) f.trail.shift();
@@ -382,38 +378,30 @@ if (isJoinMode) {
 
       if (t >= 1 && !f.arrived) {
         f.arrived = true;
-        // 修复初始化问题：给一个初始的极小缩放，让第一帧不至于消失
-        centerWinners.push({ name: f.name, born: now, scale: 0.1 });
-        createSparks(cx, cy, '#00f2fe'); // 到达爆炸
+        // 修复：初始大小设为 0.5，并设定 3 秒的停留时间
+        centerWinners.push({ name: f.name, born: now, expire: now + 3000 });
+        createSparks(cx, cy, '#00f2fe'); 
         createSparks(cx, cy, '#ffd700');
       }
     }
     flyers = flyers.filter(f => !f.arrived);
 
-    // 中心名字弹射放大
-    centerWinners.forEach(w => {
-      const age = (now - w.born) / 1000;
-      if (age < 0.4) {
-        w.scale = 0.1 + age * 2.5; // 0.4秒内快速放大
-      } else {
-        w.scale = 1.1 + Math.sin((age - 0.4) * 6) * 0.03; // 稍微大一点点并呼吸
-      }
-    });
-
-    // 批量揭晓轮换
-    if (state === 'flying' && flyers.length === 0 && centerWinners.length > 0) {
-      if (now - showTimer > 2500) {
+    // 处理中心名字排队显示
+    if (centerWinners.length > 0) {
+      if (now > centerWinners[0].expire) {
         centerWinners.shift(); 
-        showTimer = now;
-        if (centerWinners.length > 0) createSparks(cx, cy, '#00f2fe');
+        if (centerWinners.length > 0) {
+          // 如果队列里还有下一个名字，重置倒计时，开始显示下一个
+          centerWinners[0].born = now;
+          centerWinners[0].expire = now + 3000;
+        } else {
+          // 所有动画完成
+          state = 'idle';
+          $('stopBtn').disabled = true;
+          $('startBtn').disabled = false;
+          renderPrizeList();
+        }
       }
-    }
-
-    if (state === 'flying' && flyers.length === 0 && centerWinners.length === 0) {
-      state = 'idle';
-      $('stopBtn').disabled = true;
-      $('startBtn').disabled = false;
-      renderPrizeList();
     }
   }
 
@@ -421,11 +409,9 @@ if (isJoinMode) {
     if (!W) return;
     ctx.clearRect(0, 0, W, H);
     
-    // 1. 动态背景渲染
     ctx.fillStyle = '#030610';
     ctx.fillRect(0, 0, W, H);
     
-    // 背景星点
     bgStars.forEach(s => {
       ctx.fillStyle = `rgba(0, 242, 254, ${s.a})`;
       ctx.beginPath();
@@ -433,14 +419,13 @@ if (isJoinMode) {
       ctx.fill();
     });
 
-    // 背景大光晕
     const bg = ctx.createRadialGradient(cx, cy, R*0.1, cx, cy, R*1.8);
     if (state === 'spinning') {
       const pulse = Math.abs(Math.sin(now / 150));
       bg.addColorStop(0, `rgba(0, 242, 254, ${0.15 + pulse*0.1})`);
       bg.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    } else if (state === 'flying') {
-      bg.addColorStop(0, 'rgba(255, 215, 0, 0.15)'); // 中奖时泛金
+    } else if (centerWinners.length > 0) {
+      bg.addColorStop(0, 'rgba(255, 215, 0, 0.2)'); 
       bg.addColorStop(1, 'rgba(0, 0, 0, 0)');
     } else {
       bg.addColorStop(0, 'rgba(0, 242, 254, 0.05)');
@@ -449,7 +434,6 @@ if (isJoinMode) {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
-    // 2. 绘制球体
     const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
     const cosX = Math.cos(-0.18), sinX = Math.sin(-0.18);
     const arr = [];
@@ -475,34 +459,25 @@ if (isJoinMode) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    // 绘制光环
-    ctx.beginPath();
-    ctx.arc(cx, cy, R * 1.15, 0, Math.PI * 2);
-    ctx.strokeStyle = state === 'spinning' ? 'rgba(0, 242, 254, 0.5)' : 'rgba(0, 242, 254, 0.15)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    // 已移除：绘制外围光环的代码
 
-    // 绘制球体文字（增加高光）
     for (const a of arr) {
       if (a.name) {
         const depth = (a.z + 1) / 2;
-        const alpha = 0.15 + depth * 0.85; // 调高基础亮度
+        const alpha = 0.15 + depth * 0.85;
         const size = 10 + a.persp * 9;
         ctx.font = `bold ${size.toFixed(1)}px "Microsoft YaHei"`;
-        
-        // 发光特效
         ctx.shadowColor = 'rgba(0, 242, 254, 0.8)';
         ctx.shadowBlur = a.persp * 10;
         ctx.fillStyle = `rgba(220, 240, 255, ${alpha})`;
         ctx.fillText(a.name, a.x, a.y);
-        ctx.shadowBlur = 0; // 重置
+        ctx.shadowBlur = 0;
       }
     }
 
-    // 3. 绘制彗星轨迹
+    // 彗星轨迹
     for (const f of flyers) {
       if (f.pos && f.trail) {
-        // 画尾巴
         for (let i = 1; i < f.trail.length; i++) {
           const p1 = f.trail[i-1];
           const p2 = f.trail[i];
@@ -511,15 +486,12 @@ if (isJoinMode) {
           ctx.beginPath();
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
-          
-          // 尾巴颜色：青蓝色渐变到透明
           ctx.strokeStyle = `rgba(0, 242, 254, ${trailAlpha})`;
           ctx.lineWidth = trailAlpha * 8;
           ctx.lineCap = 'round';
           ctx.stroke();
         }
         
-        // 彗星头部
         const headGrad = ctx.createRadialGradient(f.pos.x, f.pos.y, 0, f.pos.x, f.pos.y, 25);
         headGrad.addColorStop(0, '#fff');
         headGrad.addColorStop(0.3, '#00f2fe');
@@ -531,7 +503,7 @@ if (isJoinMode) {
       }
     }
 
-    // 4. 绘制爆炸粒子
+    // 粒子
     for (const p of sparks) {
       ctx.globalAlpha = p.life;
       ctx.fillStyle = p.color;
@@ -544,32 +516,46 @@ if (isJoinMode) {
     ctx.globalAlpha = 1;
     ctx.shadowBlur = 0;
 
-    // 5. 绘制中心中奖名字（高光、金色、极强质感）
+    // 中心名字极度高亮
     if (centerWinners.length > 0) {
       const w = centerWinners[0];
       const age = (now - w.born) / 1000;
-      const alpha = Math.min(1, age * 5);
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.translate(cx, cy);
-      ctx.scale(w.scale, w.scale);
       
-      ctx.font = '900 110px "Microsoft YaHei"';
+      // 1. 中心聚光灯特效（背景泛金）
+      const spotlight = ctx.createRadialGradient(cx, cy, 0, cx, cy, 450);
+      spotlight.addColorStop(0, 'rgba(255, 215, 0, 0.3)');
+      spotlight.addColorStop(1, 'rgba(255, 215, 0, 0)');
+      ctx.fillStyle = spotlight;
+      ctx.fillRect(0, 0, W, H);
+
+      // 2. 弹射放大逻辑：0~0.3秒内从 0.5 放大到 1.1，之后轻微回弹
+      let scale = 1;
+      if (age < 0.3) {
+        scale = 0.5 + (age / 0.3) * 0.6;
+      } else {
+        scale = 1.1 - (age - 0.3) * 0.1;
+      }
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(scale, scale);
+      
+      ctx.font = '900 120px "Microsoft YaHei"';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       
-      // 1. 外发光（青色）
+      // 第一层：青色外发光
       ctx.shadowColor = '#00f2fe';
-      ctx.shadowBlur = 80;
+      ctx.shadowBlur = 100;
       ctx.fillStyle = '#fff';
       ctx.fillText(w.name, 0, 0);
       
-      // 2. 金色描边
-      ctx.lineWidth = 4;
+      // 第二层：金色描边
+      ctx.lineWidth = 5;
       ctx.strokeStyle = '#ffd700';
       ctx.strokeText(w.name, 0, 0);
       
-      // 3. 金色渐变填充
+      // 第三层：金色渐变填充
       const grad = ctx.createLinearGradient(0, -60, 0, 60);
       grad.addColorStop(0, '#ffffff');
       grad.addColorStop(0.3, '#fff8b0');
@@ -577,8 +563,8 @@ if (isJoinMode) {
       grad.addColorStop(1, '#ff8c00');
       ctx.fillStyle = grad;
       
-      // 4. 内部高光重叠
-      ctx.shadowBlur = 20;
+      // 第四层：中心强烈高光
+      ctx.shadowBlur = 30;
       ctx.shadowColor = '#ffd700';
       ctx.fillText(w.name, 0, 0);
       
@@ -621,7 +607,8 @@ if (isJoinMode) {
   };
 
   function renderWinners() {
-    $('winnerList').innerHTML = winners.map(w => 
+    // 倒序排列：最新的中奖者显示在最上面
+    $('winnerList').innerHTML = [...winners].reverse().map(w => 
       `<div class="winner-item"><span>${w.prize}</span><b>${w.name}</b></div>`
     ).join('') || '<div style="color:#6f8fb0;text-align:center;font-size:12px;margin-top:20px">暂无中奖记录</div>';
   }
@@ -635,7 +622,7 @@ if (isJoinMode) {
     targetSpeed = 3.5;
     $('startBtn').disabled = true;
     $('stopBtn').disabled = false;
-    centerWinners = [];
+    centerWinners = []; // 清空上一次的显示
   };
 
   $('stopBtn').onclick = () => {
@@ -676,17 +663,15 @@ if (isJoinMode) {
     renderUI();
 
     const now = performance.now();
-    showTimer = now;
     
     picked.forEach((p, index) => {
-      // 减慢飞行时间，增加拖尾
       flyers.push({
         name: p.name,
         start: { x: cx + (Math.random()-0.5)*W*0.9, y: cy + (Math.random()-0.5)*H*0.9 },
         end: { x: cx, y: cy },
         cp: { x: cx + (Math.random()-0.5)*W*0.5, y: cy + (Math.random()-0.5)*H*0.5 },
         startAt: now + 800 + index * 200, 
-        duration: 2800, // 2.8秒飞行，轨迹更明显
+        duration: 2500,
         arrived: false,
         pos: null,
         trail: []
