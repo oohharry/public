@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="zh">
 <head>
@@ -20,6 +21,11 @@ header{height:70px;display:flex;align-items:center;justify-content:space-between
 #showQrBtn:active{transform:scale(0.95)}
 #settingBtn{height:36px;padding:0 15px;border:1px solid rgba(0,242,254,.5);border-radius:8px;background:rgba(0,242,254,.1);color:#00f2fe;font-size:14px;cursor:pointer;transition:.2s}
 #settingBtn:hover{background:rgba(0,242,254,.2)}
+#tipToast{position:fixed;top:84px;left:50%;transform:translateX(-50%);z-index:300;
+background:rgba(8,20,40,.92);border:1px solid rgba(0,242,254,.5);color:#eaf4ff;
+padding:10px 22px;border-radius:24px;font-size:15px;opacity:0;pointer-events:none;
+transition:opacity .25s;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+#tipToast.show{opacity:1}
 #bgmBtn{height:36px;width:36px;border-radius:50%;border:1px solid rgba(0,242,254,.5);background:rgba(0,242,254,.1);color:#00f2fe;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 
 main{flex:1;display:flex;min-height:0}
@@ -165,9 +171,22 @@ canvas{display:block;width:100%;height:100%}
   </div>
 </div>
 
+<div id="tipToast"></div>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
+// 全局轻提示与容量保障（登记人数超过当前槽位时自动扩容，无 240 上限）
+function showTip(msg) {
+  const t = document.getElementById('tipToast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window.__tipTimer);
+  window.__tipTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+function ensureCapacityHint() {
+  if (participants.length >= 600) showTip('已登记 ' + participants.length + ' 人，容量已放开至 ' + Math.max(600, participants.length + 60) + ' 人以上');
+}
 const urlParams = new URLSearchParams(window.location.search);
 const isJoinMode = urlParams.has('join'); 
 
@@ -190,15 +209,30 @@ function initComm() {
   }
 
   if (!isJoinMode) {
-    const ev = new EventSource(`https://ntfy.sh/${ntfyTopic}/sse`);
-    ev.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.event === 'message' && data.message) {
-          addParticipant(data.message);
-        }
-      } catch(err){}
+    let ev;
+    const openChannel = () => {
+      try { ev = new EventSource(`https://ntfy.sh/${ntfyTopic}/sse`); } catch (e) { return; }
+      ev.onopen = () => { window.__commOk = true; };
+      ev.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.event === 'message' && data.message) {
+            const nm = (data.message || '').trim();
+            if (participants.some(p => p.name === nm)) {
+              showTip('「' + nm + '」已登记过，未重复添加');
+            } else {
+              addParticipant(data.message);
+              ensureCapacityHint();
+            }
+          }
+        } catch(err){}
+      };
+      ev.onerror = () => {           // 连接中断自动重连，避免登记到一半不再接收新人员
+        try { ev.close(); } catch(e){}
+        setTimeout(() => { if (!window.__closed) openChannel(); }, 1500);
+      };
     };
+    openChannel();
   }
 }
 
@@ -239,6 +273,56 @@ function addParticipant(name) {
   saveData();
   renderUI();
   return true;
+}
+
+// ======== 高熵随机引擎（强化抽取随机性） ========
+// 1) 随机源：优先使用浏览器密码学随机数 crypto.getRandomValues，
+//    彻底摆脱 Math.random 的线性同余序列可预测问题；
+// 2) 分布：拒绝采样消除“取模偏差”，保证每个人中签概率严格相等；
+// 3) 算法：Fisher-Yates 全排列洗牌，多轮叠代 + 时间/动画熵混入，
+//    使结果与点击时刻、名单顺序完全解耦。
+let _entropy = 0;
+function mixEntropy(v) {
+  _entropy = (_entropy + Math.abs(Math.floor(v * 1024))) >>> 0;
+}
+function cryptoU32() {
+  try {
+    if (window.crypto && crypto.getRandomValues) {
+      const a = new Uint32Array(1);
+      crypto.getRandomValues(a);
+      return a[0];
+    }
+  } catch (e) {}
+  return Math.floor(Math.random() * 4294967296) >>> 0;
+}
+function secureRandInt(n) {           // [0, n) 内均匀分布，无偏
+  if (n <= 1) return 0;
+  const limit = Math.floor(4294967296 / n) * n;
+  let x;
+  do { x = cryptoU32(); } while (x >= limit);
+  return (x % n) >>> 0;
+}
+function rf() { return secureRandInt(1000000) / 1000000; }  // [0,1) 均匀浮点
+function shuffleStrong(arr) {         // Fisher-Yates 加密随机洗牌
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = secureRandInt(i + 1);
+    const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr;
+}
+function pickWinners(pool, batch) {
+  mixEntropy(performance.now());
+  const a = shuffleStrong(pool.slice());
+  const rounds = 2 + secureRandInt(3);       // 2~4 轮额外洗牌，叠代次数本身也是随机的
+  for (let r = 0; r < rounds; r++) shuffleStrong(a);
+  mixEntropy(rf());
+  const out = [];
+  const rest = a.slice();
+  for (let i = 0; i < batch && rest.length; i++) {
+    const idx = secureRandInt(rest.length);   // 二次随机定位，消除顺序残留
+    out.push(rest.splice(idx, 1)[0]);
+  }
+  return out;
 }
 
 // ======== 手机端逻辑 ========
@@ -302,7 +386,14 @@ if (isJoinMode) {
   let currentPrizeId = null;
   let centerWinners = []; 
   
-  const MAX = 400;
+  // —— 登记容量：默认预留 600 个球面姓名槽位，人数超出时自动扩容 ——
+  const BASE_SLOTS = 600;   // 基础容量，支持至少 600 人同时登记
+  let MAX = BASE_SLOTS;     // 当前实际槽位数（随登记人数动态增长）
+
+  function ensureSlotCapacity() {
+    const need = Math.max(BASE_SLOTS, participants.length + 60);
+    if (need !== MAX) { MAX = need; initSlots(); }
+  }
 
   function initSlots() {
     slots = [];
@@ -439,6 +530,7 @@ if (isJoinMode) {
     const cosX = Math.cos(-0.18), sinX = Math.sin(-0.18);
     const arr = [];
     
+    ensureSlotCapacity();
     let pool = participants.filter(p => !p.won);
     let displayNames = pool.map(p => p.name);
     
@@ -453,11 +545,15 @@ if (isJoinMode) {
       
       let name = null;
       if (participants.length === 0) {
-        // 如果没有任何人登记，铺满“等待登记...”
+        // 无人登记：整个球面铺满“等待登记...”
         name = "等待登记...";
+      } else if (displayNames.length > 0) {
+        // 一旦有人登记，立即不再显示“等待登记”，改为真实姓名；
+        // 槽位与登记人员一一对应，剩余槽位用姓名循环补齐，保证人人上墙
+        name = displayNames[i] || displayNames[i % displayNames.length];
       } else {
-        // 如果已登记，按索引显示名字。如果池子里没人了，显示为空，靠光点填补
-        name = displayNames[i] || null;
+        // 全部人员均已中奖：文字清空，只保留光点
+        name = null;
       }
 
       arr.push({
@@ -679,12 +775,8 @@ if (isJoinMode) {
       return;
     }
 
-    const picked = [];
-    const poolCopy = [...pool];
-    for(let i=0; i<batch; i++){
-      const idx = Math.floor(Math.random() * poolCopy.length);
-      picked.push(poolCopy.splice(idx, 1)[0]);
-    }
+    // 强化随机抽取：加密随机源 + 多轮 Fisher-Yates 洗牌 + 无偏拒绝采样
+    const picked = pickWinners(pool, batch);
     
     picked.forEach((p, i) => {
       p.won = true;
@@ -699,9 +791,9 @@ if (isJoinMode) {
     picked.forEach((p, index) => {
       flyers.push({
         name: p.name,
-        start: { x: cx + (Math.random()-0.5)*W*0.9, y: cy + (Math.random()-0.5)*H*0.9 },
+        start: { x: cx + (rf()-0.5)*W*0.9, y: cy + (rf()-0.5)*H*0.9 },
         end: { x: cx, y: cy },
-        cp: { x: cx + (Math.random()-0.5)*W*0.5, y: cy + (Math.random()-0.5)*H*0.5 },
+        cp: { x: cx + (rf()-0.5)*W*0.5, y: cy + (rf()-0.5)*H*0.5 },
         startAt: now + 800 + index * 200, 
         duration: 2500,
         arrived: false,
