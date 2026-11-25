@@ -12,15 +12,16 @@ body{background:#030610;color:#eaf4ff;font-family:"Microsoft YaHei",sans-serif;o
 
 /* ---------- 大屏端样式 ---------- */
 #screen{height:100vh;display:flex;flex-direction:column;position:relative;z-index:10}
-header{height:70px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid rgba(90,170,255,.2);background:rgba(8,20,40,.7);backdrop-filter:blur(10px)}
+header{height:70px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 20px;border-bottom:1px solid rgba(90,170,255,.2);background:rgba(8,20,40,.7);backdrop-filter:blur(10px)}
 .brand{font-size:32px;font-weight:900;letter-spacing:4px;background:linear-gradient(90deg,#00f2fe,#4facfe,#00f2fe);-webkit-background-clip:text;color:transparent;text-shadow:0 0 20px rgba(0,242,254,.4)}
-.header-right{display:flex;align-items:center;gap:20px}
+.header-right{display:flex;align-items:center;gap:14px;min-width:0}
 .count{font-size:18px;color:#bfe0ff}
 .count span{font-size:36px;font-weight:bold;color:#fff;margin:0 5px;text-shadow:0 0 20px #00f2fe, 0 0 40px #00f2fe}
-#showQrBtn{height:44px;padding:0 20px;border-radius:8px;background:linear-gradient(180deg,#00f2fe,#4facfe);color:#030610;font-size:16px;font-weight:bold;cursor:pointer;border:none;box-shadow:0 4px 15px rgba(0,242,254,.4);transition:.2s}
+#showQrBtn{height:44px;padding:0 18px;white-space:nowrap;border-radius:8px;background:linear-gradient(180deg,#00f2fe,#4facfe);color:#030610;font-size:16px;font-weight:bold;cursor:pointer;border:none;box-shadow:0 4px 15px rgba(0,242,254,.4);transition:.2s}
 #showQrBtn:active{transform:scale(0.95)}
-#settingBtn{height:36px;padding:0 15px;border:1px solid rgba(0,242,254,.5);border-radius:8px;background:rgba(0,242,254,.1);color:#00f2fe;font-size:14px;cursor:pointer;transition:.2s}
+#settingBtn{height:36px;padding:0 14px;white-space:nowrap;border:1px solid rgba(0,242,254,.5);border-radius:8px;background:rgba(0,242,254,.1);color:#00f2fe;font-size:14px;cursor:pointer;transition:.2s}
 #settingBtn:hover{background:rgba(0,242,254,.2)}
+#rosterBtn{white-space:nowrap}
 #tipToast{position:fixed;top:84px;left:50%;transform:translateX(-50%);z-index:300;
 background:rgba(8,20,40,.92);border:1px solid rgba(0,242,254,.5);color:#eaf4ff;
 padding:10px 22px;border-radius:24px;font-size:15px;opacity:0;pointer-events:none;
@@ -77,7 +78,8 @@ canvas{display:block;width:100%;height:100%}
 .card input:focus{border-color:#00f2fe;box-shadow:0 0 15px rgba(0,242,254,.3)}
 .card button{width:100%;height:50px;border:none;border-radius:8px;background:linear-gradient(180deg,#00f2fe,#4facfe);color:#030610;font-size:18px;font-weight:bold;cursor:pointer;margin-top:10px}
 .card button:disabled{opacity:.5}
-#msg{margin-top:15px;font-size:14px;color:#00f2fe;min-height:20px}
+#msg{margin-top:15px;font-size:14px;color:#00f2fe;min-height:20px;line-height:1.6}
+.mcard-tip{margin-top:14px;font-size:12px;color:#6f8fb0;line-height:1.6;border-top:1px solid rgba(90,170,255,.14);padding-top:12px}
 
 /* ---------- 设置弹窗 ---------- */
 #modalOverlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(5px)}
@@ -96,8 +98,10 @@ canvas{display:block;width:100%;height:100%}
 #savePrizesBtn{background:linear-gradient(180deg,#00f2fe,#4facfe);color:#030610}
 #resetBtn{background:rgba(255,94,61,.2);color:#ff5e3d;margin-top:10px;width:100%;height:38px;border:none;border-radius:6px;cursor:pointer;font-size:14px}
 /* ---- 名单管理（现场兜底录入 + 通道设置） ---- */
-.sync-stat{font-size:12px;color:#7fa8cc;font-weight:normal;margin-left:10px;white-space:nowrap}
+.count .sync-stat{font-size:12px;color:#7fa8cc;font-weight:normal;margin-left:10px;white-space:nowrap;line-height:1.2}
+.count{display:flex;align-items:center;overflow:hidden;text-overflow:ellipsis}
 .sync-stat.bad{color:#ff5e3d}
+.sync-stat.warn{color:#ffb020}
 .sync-stat.good{color:#41ffb0}
 #rosterModal{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:120;backdrop-filter:blur(5px)}
 #rosterBox{width:900px;max-width:95vw;max-height:90vh;overflow:auto;background:#0f1a2e;border:1px solid rgba(0,242,254,.32);border-radius:16px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.85)}
@@ -184,6 +188,7 @@ canvas{display:block;width:100%;height:100%}
     <input id="m_name" placeholder="请输入姓名（必填）" maxlength="20" autocomplete="off">
     <button id="m_submit">提交登记</button>
     <p id="msg"></p>
+    <p class="mcard-tip">如提示登记失败，请检查手机网络后重试，或将姓名告知现场工作人员代为录入。</p>
   </div>
 </div>
 
@@ -225,17 +230,20 @@ canvas{display:block;width:100%;height:100%}
           <button class="rz-btn danger" id="rz_clear">清空名单</button>
           <button class="rz-btn" id="rz_restore">恢复上次名单</button>
         </div>
-        <div class="rz-tip">扫码登记与现场录入可混用，人数无上限；导入后自动存入本机并参与抽奖。</div>
+        <div class="rz-tip">登记方式共四种，可混用、人数无上限：<br>① 扫码填写提交　② 链接带姓名一键登记（?join=房间号&amp;name=张三，适合群里接龙）　③ 此处现场录入 / 批量导入（完全不依赖外网）　④ 手机本机排队自动补发。</div>
       </div>
       <div class="rz-sec">
-        <h4>同步通道</h4>
+        <h4>登记通道（双通路并联，自动择优）</h4>
         <div class="rz-row">
-          <span style="font-size:13px;color:#9fc4e6">通道服务器</span>
+          <span style="font-size:13px;color:#9fc4e6">HTTP 推送服务器</span>
           <input id="rz_server" placeholder="https://ntfy.sh" style="flex:1;min-width:160px">
         </div>
         <div class="rz-row">
           <span style="font-size:13px;color:#9fc4e6">并行子通道</span>
           <input id="rz_chsub" type="number" min="2" max="16" style="width:70px">
+          <label style="font-size:13px;color:#9fc4e6;display:flex;align-items:center;gap:5px">
+            <input id="rz_mqtt" type="checkbox" style="width:auto;height:auto">启用 MQTT 网关
+          </label>
           <button class="rz-btn" id="rz_saveComm">保存并重连</button>
         </div>
         <div class="rz-tip" id="rz_commTip"></div>
@@ -260,17 +268,11 @@ function showTip(msg) {
   window.__tipTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-// ======== 多色高亮调色板（人名随机配色，混合多种色彩） ========
-const NAME_PALETTE = ['#7df9ff','#ffd700','#ff8ad4','#8affc1','#c4a1ff','#ff9e6b','#7ecbff','#fff36b','#ff6b9d','#6bffb0','#ffa8ff','#9effff','#ffd0a8','#d8b4ff'];
-function pickNameColor(){ return NAME_PALETTE[Math.floor(Math.random() * NAME_PALETTE.length)]; }
-function hexShade(hex, f){
-  const n = parseInt(String(hex).slice(1), 16);
-  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  r = Math.max(0, Math.min(255, Math.round(r * f)));
-  g = Math.max(0, Math.min(255, Math.round(g * f)));
-  b = Math.max(0, Math.min(255, Math.round(b * f)));
-  return 'rgb(' + r + ',' + g + ',' + b + ')';
-}
+// ======== 文字配色：恢复原设定（名字统一青白、光点统一青蓝），不再使用多色高亮 ========
+const NAME_RGB = '220, 240, 255';   // 人名填充（透明度由景深决定）
+const NAME_GLOW = 'rgba(0, 242, 254, 0.8)';
+const DOT_RGB = '150, 240, 255';    // 未登记槽位的光点
+const ORBIT_RGB = '0, 242, 254';    // 球体轨道线
 
 // ======== 名单应急恢复：每次破坏性操作前自动快照，最多留 20 份，可一键撤销 ========
 let undoStack = [];
@@ -307,18 +309,34 @@ function hashStr(str) {
 // 每条通道按消息游标定期回补拉取，即使某条连接断开或某次推送错过也能补回；
 // 手机端严格校验服务端返回，失败自动换通道重试并排队补发，绝不谎报成功。
 const WIRE_SEP = ' ||| ';
+// ======== 登记通道：两条通路并联 + 本机排队补发（本轮重点） ========
+// 通路 A｜ntfy：手机 HTTP 发布 → 大屏 SSE 实时接收 → 每 20 秒按游标回补拉取；
+//            一个房间拆成多条子通道，摊薄公共服务的单通道限额。
+// 通路 B｜MQTT over WebSocket：并联 4 个公共 MQTT 网关（EMQX / HiveMQ / Mosquitto / MQTTX）。
+//            WebSocket 走 HTTP(S) 端口握手，不受部分网络掐断长连接的影响，与 A 互为备份，
+//            任一路接通即可正常登记。
+// 手机端 A、B 同时发一份（消息内带唯一编号），大屏按编号幂等去重，因此双发不会重复计人。
+// 两条通路都失败时，手机端把登记写入本机队列持续自动补发，并明确提示“登记失败”。
+const NTFY_DEFAULT = 'https://ntfy.sh';
+const MQTT_BROKERS = [
+  { name: 'EMQX',       url: 'wss://broker.emqx.io:8084/mqtt' },
+  { name: 'HiveMQ',     url: 'wss://broker.hivemq.com:8884/mqtt' },
+  { name: 'Mosquitto',  url: 'wss://test.mosquitto.org:8081/mqtt' },
+  { name: 'EMQX(明文)', url: 'ws://broker.emqx.io:8083/mqtt' }   // 降级用：大屏以 http/本地文件打开时可用
+];
+const MQTT_CDNS = [
+  'https://cdn.jsdelivr.net/npm/mqtt@5/dist/mqtt.min.js',
+  'https://fastly.jsdelivr.net/npm/mqtt@5/dist/mqtt.min.js',
+  'https://unpkg.com/mqtt@5/dist/mqtt.min.js'
+];
 let COMM = {
-  server: 'https://ntfy.sh',
+  server: NTFY_DEFAULT,
   base: '',
-  subs: 12,
-  es: [],
-  lastId: [],
-  chOk: [],
-  pollOk: 0,
-  lastSync: 0,
-  pollTimer: null,
-  seq: 0,
-  started: false
+  subs: 8,
+  useMqtt: true,
+  es: [], lastId: [], chOk: [],
+  mqtt: [], mqttLib: null, mqttLibTried: false,
+  pollOk: 0, lastSync: 0, pollTimer: null, seq: 0, started: false
 };
 
 function commSetup() {
@@ -327,14 +345,16 @@ function commSetup() {
     if (sv) COMM.server = sv.replace(/\/+$/, '');
     const cs = parseInt(localStorage.getItem('lottery_comm_subs'), 10);
     if (cs >= 2 && cs <= 16) COMM.subs = cs;
-    if (!localStorage.getItem('lottery_comm_subs')) COMM.subs = 12;
+    if (localStorage.getItem('lottery_comm_mqtt') === '0') COMM.useMqtt = false;
   } catch (e) {}
   if (urlParams.get('srv')) COMM.server = decodeURIComponent(urlParams.get('srv')).replace(/\/+$/, '');
   const ch = parseInt(urlParams.get('ch'), 10);
   if (ch >= 2 && ch <= 16) COMM.subs = ch;
-  if (!/^https?:\/\//.test(COMM.server)) COMM.server = 'https://ntfy.sh';
+  if (urlParams.get('mqtt') === '0') COMM.useMqtt = false;
+  if (!/^https?:\/\//.test(COMM.server)) COMM.server = NTFY_DEFAULT;
 }
 function subTopic(i) { return COMM.base + '_' + i; }
+function mqttTopic(i) { return 'l600/' + subTopic(i); }
 function topicSlot(key) {
   let h = 2166136261; const str = String(key == null ? Date.now() : key);
   for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = (h * 16777619) >>> 0; }
@@ -355,24 +375,29 @@ function wireParse(raw) {
   if (!nm) return null;
   return { name: nm.slice(0, 20), uid: uid || ('legacy_' + hashStr(nm)) };
 }
-function stampSync() {
-  COMM.lastSync = Date.now();
-  renderSyncStat();
-}
+function stampSync() { COMM.lastSync = Date.now(); renderSyncStat(); }
+
+// 顶部通道状态（措辞收敛，不再常驻刺眼的“未连接”红字）
 function renderSyncStat() {
   const el = document.getElementById('syncStat');
   if (!el) return;
-  const live = COMM.chOk.filter(Boolean).length;
-  const tm = COMM.lastSync ? new Date(COMM.lastSync).toLocaleTimeString('zh-CN', { hour12: false }) : '尚未同步';
-  if (!COMM.started) { el.textContent = ''; el.className = 'sync-stat'; return; }
-  if (live === 0) {
-    el.textContent = '扫码通道未连接（可在“名单管理”现场录入，不受影响）';
-    el.className = 'sync-stat bad';
+  if (!COMM.started && !COMM.useMqtt) { el.textContent = ''; el.className = 'sync-stat'; return; }
+  const n = COMM.chOk.filter(Boolean).length;
+  const m = COMM.mqtt.filter(x => x && x.ok).length;
+  const tm = COMM.lastSync ? new Date(COMM.lastSync).toLocaleTimeString('zh-CN', { hour12: false }) : '';
+  if (n === 0 && m === 0) {
+    el.textContent = '通道接通中，可用名单管理录入';
+    el.className = 'sync-stat warn';
   } else {
-    el.textContent = '同步 ' + live + '/' + COMM.subs + ' 通道 · ' + tm;
-    el.className = live >= COMM.subs ? 'sync-stat good' : 'sync-stat';
+    const parts = [];
+    if (n) parts.push('HTTP ' + n + '/' + COMM.subs);
+    if (m) parts.push('MQTT ' + m + '/' + MQTT_BROKERS.length);
+    el.textContent = '通道：' + parts.join(' · ') + (tm ? ' · ' + tm : '');
+    el.className = 'sync-stat good';
   }
 }
+
+/* ---------- 通路 A：ntfy ---------- */
 function openSSE(i) {
   let es = null;
   const open = () => {
@@ -390,7 +415,6 @@ function openSSE(i) {
         stampSync();
       }
     };
-    // 断线自动重连（带随机退避），重连后由回补拉取把断线期间漏掉的登记补回
     es.onerror = () => {
       COMM.chOk[i] = false;
       renderSyncStat();
@@ -429,24 +453,107 @@ function startPoller() {
     for (let i = 0; i < COMM.subs; i++) {
       const ok = await pollChannel(i);
       if (ok) stampSync();
-      await sleep(260);          // 各通道错峰，避免瞬时并发触发限额
+      await sleep(240);
     }
   };
   run();
   COMM.pollTimer = setInterval(run, 20000);
 }
+
+/* ---------- 通路 B：MQTT over WebSocket ---------- */
+function loadMqttLib(done) {
+  if (COMM.mqttLib) return done(true);
+  if (COMM.mqttLibTried) return done(false);
+  COMM.mqttLibTried = true;
+  let k = 0;
+  const tryNext = () => {
+    if (k >= MQTT_CDNS.length) return done(false);
+    const sc = document.createElement('script');
+    sc.src = MQTT_CDNS[k++];
+    sc.async = true;
+    sc.onload = () => { COMM.mqttLib = window.mqtt || null; done(!!COMM.mqttLib); };
+    sc.onerror = () => tryNext();
+    (document.head || document.documentElement).appendChild(sc);
+  };
+  tryNext();
+}
+function startMqtt(subscribeIt) {
+  if (!COMM.useMqtt) return;
+  loadMqttLib((ok) => {
+    if (!ok) return;
+    MQTT_BROKERS.forEach((br, bi) => {
+      const old = COMM.mqtt[bi];
+      if (old && old.client) return;
+      const st = { name: br.name, ok: false, client: null };
+      COMM.mqtt[bi] = st;
+      let c = null;
+      try {
+        c = COMM.mqttLib.connect(br.url, {
+          clientId: 'l600' + hashStr(COMM.base + '_' + bi + '_' + Math.random()).slice(0, 10),
+          keepalive: 30, reconnectPeriod: 4000, connectTimeout: 9000
+        });
+      } catch (e) { return; }
+      if (!c) return;
+      st.client = c;
+      c.on('connect', () => {
+        st.ok = true; stampSync();
+        if (subscribeIt) {
+          const obj = {};
+          for (let i = 0; i < COMM.subs; i++) obj[mqttTopic(i)] = { qos: 1 };
+          try { c.subscribe(obj); } catch (e) {}
+        }
+      });
+      c.on('message', (topic, payload) => {
+        if (!subscribeIt) return;
+        if (String(topic).indexOf('l600/') !== 0) return;
+        const w = wireParse(payload && payload.toString ? payload.toString() : payload);
+        if (w) onRemoteAdd(w);
+        stampSync();
+      });
+      c.on('close', () => { st.ok = false; renderSyncStat(); });
+      c.on('error', () => { st.ok = false; renderSyncStat(); });
+    });
+  });
+}
+function mqttPublish(text) {
+  return new Promise((resolve) => {
+    if (!COMM.useMqtt) return resolve(false);
+    const live = COMM.mqtt.filter(x => x && x.ok && x.client);
+    if (!live.length) return resolve(false);
+    let doneCnt = 0, okAny = false, finished = false;
+    const fin = (v) => { if (!finished) { finished = true; clearInterval(iv); resolve(v); } };
+    const iv = setInterval(() => { if (Date.now() - t0 > 4000) fin(okAny); }, 200);
+    const t0 = Date.now();
+    live.forEach(st => {
+      try {
+        st.client.publish(mqttTopic(secureRandInt(COMM.subs)), text, { qos: 1 }, (err) => {
+          doneCnt++;
+          if (!err) okAny = true;
+          if (doneCnt >= live.length) fin(okAny);
+        });
+      } catch (e) { doneCnt++; if (doneCnt >= live.length) fin(okAny); }
+    });
+  });
+}
+function stopMqtt() {
+  COMM.mqtt.forEach(st => { if (st && st.client) { try { st.client.end(true); } catch (e) {} } });
+  COMM.mqtt = [];
+}
+
 function startCommReceiver() {
   COMM.started = true;
   COMM.es = []; COMM.lastId = []; COMM.chOk = [];
   for (let i = 0; i < COMM.subs; i++) { COMM.es.push(null); COMM.lastId.push(''); COMM.chOk.push(false); }
   for (let i = 0; i < COMM.subs; i++) openSSE(i);
   startPoller();
+  startMqtt(true);
   renderSyncStat();
 }
 function restartComm() {
   COMM.es.forEach(e => { try { if (e) e.close(); } catch (x) {} });
   if (COMM.pollTimer) clearInterval(COMM.pollTimer);
   COMM.pollTimer = null;
+  stopMqtt();
   startCommReceiver();
 }
 function ensureCapacityHint() {
@@ -474,7 +581,7 @@ function initComm() {
     }
   }
   COMM.base = 'lucky600_' + roomId;
-  if (!isJoinMode) startCommReceiver();
+  if (isJoinMode) startMqtt(false); else startCommReceiver();
 }
 
 // ======== 数据存储逻辑 ========
@@ -566,6 +673,7 @@ function removeParticipant(uid) {
 
 // 扫码/推送到达的登记（SSE 实时与回补拉取共用同一入口，按 uid 天然幂等）
 function onRemoteAdd(w) {
+  if (isJoinMode) return false;                 // 手机端只发不收，忽略回声
   const added = addParticipant(w.name, w.uid, 'scan');
   if (!added) return false;
   ensureCapacityHint();
@@ -641,31 +749,28 @@ if (isJoinMode) {
     m.textContent = text;
   }
 
-  // 严格校验服务端返回：只有通道真的收下（HTTP 2xx）才认定登记成功，
-  // 失败自动换下一条子通道重试，避开免费公共服务单通道的小时限额
-  async function publishTo(name, uid) {
-    const body = wireText(name, uid);
-    // 起始通道用密码学随机数选取，把人流均匀摊到各条子通道，避免单条通道被限额
-    const first = (typeof secureRandInt === 'function') ? secureRandInt(COMM.subs) : topicSlot(uid);
-    const tries = Math.min(COMM.subs, 6);
-    let err = '通道无响应';
+  // 双通路投递：A＝ntfy（HTTP，严格校验服务端 2xx 才算送达）；B＝MQTT（WebSocket 公共网关）
+  async function publishNtfy(body) {
+    const first = secureRandInt(COMM.subs);
+    const tries = Math.min(COMM.subs, 5);
     for (let a = 0; a < tries; a++) {
       const idx = (first + a) % COMM.subs;
       try {
         const res = await fetch(COMM.server + '/' + subTopic(idx), { method: 'POST', body: body });
-        if (res.ok) return true;
-        err = '通道繁忙（HTTP ' + res.status + '）';
-        await sleep(res.status === 429 ? 1400 + a * 900 : 700 + a * 700);
-      } catch (e) {
-        err = '网络异常';
-        await sleep(700 + a * 700);
-      }
+        if (res.ok) return true;                      // 服务端确实收下，才认为登记成功
+        await sleep(res.status === 429 ? 900 + a * 700 : 400 + a * 350);
+      } catch (e) { await sleep(400 + a * 350); }
     }
-    throw new Error(err);
+    return false;
+  }
+  async function publishWire(name, uid) {
+    const body = wireText(name, uid);
+    const rs = await Promise.all([publishNtfy(body), mqttPublish(body)]);
+    return rs.some(Boolean);
   }
 
   let flushing = false;
-  async function flushQueue() {
+  async function flushQueue(quiet) {
     if (flushing) return 0;
     const q = loadQueue();
     if (!q.length) return 0;
@@ -673,34 +778,32 @@ if (isJoinMode) {
     const rest = [];
     let sent = 0;
     for (const item of q) {
-      try {
-        await publishTo(item.name, item.uid);
-        sent++;
-      } catch (e) {
-        item.tries = (item.tries || 0) + 1;
-        if (item.tries <= 12) rest.push(item);
-      }
+      const ok = await publishWire(item.name, item.uid);
+      if (ok) sent++;
+      else { item.tries = (item.tries || 0) + 1; if (item.tries <= 20) rest.push(item); }
     }
     saveQueue(rest);
     flushing = false;
+    if (sent) setMsg('登记成功！请关注现场大屏', '#00f2fe');
     if (rest.length) {
-      setMsg('通道拥挤，已排队 ' + rest.length + ' 条，正在自动重试（请勿重复提交）', '#ffb020');
-    } else if (sent) {
-      setMsg('登记成功！请关注现场大屏', '#00f2fe');
+      if (!sent) {
+        setMsg('登记失败：当前网络连不上登记通道。已在本机排队 ' + rest.length +
+               ' 条并自动重试；也可以把姓名告知现场工作人员代为录入。', '#ff5e3d');
+      } else {
+        setMsg('部分登记失败，已排队 ' + rest.length + ' 条自动重试', '#ffb020');
+      }
     }
-    $('m_submit').disabled = false;
-    $('m_submit').textContent = '提交登记';
     return sent;
   }
 
-  $('m_submit').onclick = async () => {
-    const name = $('m_name').value.trim();
-    if (!name) { setMsg('请输入姓名', '#ff5e3d'); return; }
-    if (name.length > 20) { setMsg('姓名过长（不超过 20 字）', '#ff5e3d'); return; }
+  async function submitName(raw) {
+    const name = String(raw == null ? '' : raw).trim().replace(/\s+/g, ' ').slice(0, 20);
+    if (!name) { setMsg('请输入姓名', '#ff5e3d'); return false; }
+    if (name.length > 20) { setMsg('姓名过长（不超过 20 字）', '#ff5e3d'); return false; }
     const mine = loadMine();
     if (mine.some(m => m.name === name)) {
       setMsg('您已登记过「' + name + '」，如需修改请联系现场主持人', '#ffb020');
-      return;
+      return false;
     }
     const uid = newUid('s');
     mine.push({ name: name, uid: uid, t: Date.now() });
@@ -712,12 +815,24 @@ if (isJoinMode) {
     $('m_submit').disabled = true;
     $('m_submit').textContent = '提交中...';
     setMsg('正在提交到抽奖大屏...', '#9fc4e6');
-    await flushQueue();
-    $('m_name').value = '';
-    setTimeout(() => { $('m_submit').disabled = false; $('m_submit').textContent = '提交登记'; }, 800);
-  };
+    await flushQueue(true);
+    if (!loadQueue().length) $('m_name').value = '';      // 仅在确实送达后清空输入框
+    $('m_submit').disabled = false;
+    $('m_submit').textContent = '提交登记';
+    return true;
+  }
 
+  $('m_submit').onclick = () => submitName($('m_name').value);
   $('m_name').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('m_submit').click(); });
+
+  flushQueue(true);                              // 进入页面先补发上次未成功的登记
+  setInterval(() => flushQueue(true), 9000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) flushQueue(true); });
+
+  // 第三种参与方式：链接直接带姓名（?join=房间号&name=张三），群里接龙或工作人员代录时一键提交
+  const autoName = String(urlParams.get('name') || '').trim();
+  if (autoName) { $('m_name').value = autoName; setTimeout(() => submitName(autoName), 700); }
+
 
   flushQueue();                              // 进入页面先补发上次未成功的登记
   setInterval(flushQueue, 9000);
@@ -749,11 +864,11 @@ if (isJoinMode) {
     if (!box) return;
     box.innerHTML = '';
     try { new QRCode(box, { text: buildJoinUrl(), width: 360, height: 360 }); }
-    catch (e) { box.innerHTML = '<div style="color:#cfe8ff;max-width:340px;word-break:break-all">' + buildJoinUrl() + '</div>'; }
+    catch (e) { box.innerHTML = '<div style="color:#c0392b;font-size:15px;padding:40px 10px">二维码组件未能加载<br><span style="font-size:12px;color:#8fb8e0">请连网后刷新页面，或改用「名单管理」录入</span></div>'; }
   }
   renderQR();
   const qrTips = $('qrTips');
-  if (qrTips) qrTips.innerHTML = '微信 / 手机浏览器 扫码参与<br><span style="font-size:12px;color:#8fb8e0;word-break:break-all">' + buildJoinUrl() + '</span>';
+  if (qrTips) qrTips.textContent = '微信 / 手机浏览器 扫码参与';
   $('showQrBtn').onclick = () => $('qrModal').style.display = 'flex';
   $('qrModal').onclick = () => $('qrModal').style.display = 'none';
 
@@ -771,9 +886,22 @@ if (isJoinMode) {
   const BASE_SLOTS = 600;   // 基础容量，支持至少 600 人同时登记
   let MAX = BASE_SLOTS;     // 当前实际槽位数（随登记人数动态增长）
 
+  // 单个随机球面槽位：扩容时只“追加”新点，绝不清空已有槽位，
+  // 因此人数增长（600 → 660 → …）不会让已上墙的名字整体跳动重排。
+  function makeRandomSlot() {
+    const u = rf() * 2 - 1, phi = rf() * Math.PI * 2, r = Math.sqrt(Math.max(0, 1 - u * u));
+    return {
+      bx: Math.cos(phi) * r, by: u, bz: Math.sin(phi) * r,
+      name: null, owner: null,
+      seed: Math.random(),
+      sx: 0, sy: 0, sz: 0, persp: 1
+    };
+  }
   function ensureSlotCapacity() {
     const need = Math.max(BASE_SLOTS, participants.length + 60);
-    if (need !== MAX) { MAX = need; initSlots(); }
+    if (need <= slots.length) { MAX = slots.length; return; }
+    while (slots.length < need) slots.push(makeRandomSlot());   // 原地追加，保留既有绑定
+    MAX = slots.length;
   }
 
   function initSlots() {
@@ -784,7 +912,7 @@ if (isJoinMode) {
       const theta = Math.PI * (3 - Math.sqrt(5)) * i;
       slots.push({
         bx: Math.cos(theta) * r, by: y, bz: Math.sin(theta) * r,
-        name: null, owner: null, col: pickNameColor(),
+        name: null, owner: null,
         seed: Math.random(),          // 每个光点独立的闪烁相位
         sx: 0, sy: 0, sz: 0, persp: 1 // 每帧缓存球面投影坐标，供“光点飞出”取起点
       });
@@ -830,7 +958,6 @@ if (isJoinMode) {
       const s = slots[free[fi++]];
       s.name = toAssign[k].disp || toAssign[k].name;
       s.owner = toAssign[k];
-      s.col = pickNameColor();   // 每次上墙随机分配一种高亮主色
     }
   }
 
@@ -895,6 +1022,51 @@ if (isJoinMode) {
     cx = W / 2; cy = H / 2; R = Math.min(W, H) * 0.38;
   }
   window.addEventListener('resize', resize);
+
+  // ===== 球体轨道线：与点云共用同一旋转 + 透视，随球体一起转动，提升观感 =====
+  const ORBITS = [
+    { tilt: 0.04,  scale: 1.12, base: 0.30, wid: 1.2 },   // 近赤道环
+    { tilt: 0.66,  scale: 1.05, base: 0.22, wid: 1.0 },   // 斜环一
+    { tilt: -0.72, scale: 1.18, base: 0.18, wid: 1.0 }    // 斜环二
+  ];
+  function orbitPoint(o, ang, cosY, sinY, cosX, sinX) {
+    const bx = Math.cos(ang) * o.scale;
+    const by = Math.sin(ang) * o.scale * Math.sin(o.tilt);
+    const bz = Math.sin(ang) * o.scale * Math.cos(o.tilt);
+    let x = bx * cosY - bz * sinY;
+    let z = bx * sinY + bz * cosY;
+    let y = by * cosX - z * sinX;
+    z = by * sinX + z * cosX;
+    const persp = 2.4 / (2.4 + z);
+    return { x: cx + x * R * persp, y: cy + y * R * persp, z: z, persp: persp };
+  }
+  function drawOrbits(front, now) {
+    const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+    const cosX = Math.cos(-0.18), sinX = Math.sin(-0.18);
+    const SEG = 116;
+    ctx.lineCap = 'round';
+    for (const o of ORBITS) {
+      let prev = orbitPoint(o, 0, cosY, sinY, cosX, sinX);
+      for (let i = 1; i <= SEG; i++) {
+        const ang = (i / SEG) * Math.PI * 2;
+        const p = orbitPoint(o, ang, cosY, sinY, cosX, sinX);
+        const z = (prev.z + p.z) / 2;
+        if ((z >= 0) === front) {
+          const depth = Math.max(0, Math.min(1, (z + 1.2) / 2.4));
+          const pulse = 0.82 + 0.18 * Math.sin(now * 0.0015 + ang * 3 + o.tilt * 4);
+          const al = o.base * (0.14 + depth * 1.0) * pulse;
+          ctx.beginPath();
+          ctx.moveTo(prev.x, prev.y);
+          ctx.lineTo(p.x, p.y);
+          ctx.strokeStyle = 'rgba(' + ORBIT_RGB + ',' + al.toFixed(3) + ')';
+          ctx.lineWidth = o.wid * (0.5 + depth * 0.9);
+          ctx.stroke();
+        }
+        prev = p;
+      }
+    }
+    ctx.lineCap = 'butt';
+  }
 
   function createSparks(x, y, color = '#00f2fe') {
     for (let i = 0; i < 80; i++) {
@@ -998,6 +1170,7 @@ if (isJoinMode) {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
+    drawOrbits(false, now);      // 球体背侧轨道线（垫在点云后面）
     const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
     const cosX = Math.cos(-0.18), sinX = Math.sin(-0.18);
     const arr = [];
@@ -1020,7 +1193,7 @@ if (isJoinMode) {
       s.sz = z;
       s.persp = persp;
 
-      arr.push({ x: s.sx, y: s.sy, z: z, persp: persp, name: s.name, seed: s.seed, col: s.col });
+      arr.push({ x: s.sx, y: s.sy, z: z, persp: persp, name: s.name, seed: s.seed });
     }
     
     arr.sort((a, b) => a.z - b.z);
@@ -1029,44 +1202,33 @@ if (isJoinMode) {
 
     for (const a of arr) {
       if (a.name) {
+        // 原色彩设定：统一青白人名，靠景深调亮度，不使用多色高亮
         const depth = (a.z + 1) / 2;
-        const alpha = 0.45 + depth * 0.55;
+        const alpha = 0.15 + depth * 0.85;
         const size = 10 + a.persp * 9;
-        const col = a.col || '#dff0ff';
         ctx.font = `bold ${size.toFixed(1)}px "Microsoft YaHei"`;
-        ctx.globalAlpha = alpha;
-        ctx.shadowColor = col;
-        ctx.shadowBlur = 6 + depth * 16;
-        const ng = ctx.createLinearGradient(a.x, a.y - size, a.x, a.y + size);
-        ng.addColorStop(0, '#ffffff');
-        ng.addColorStop(0.45, col);
-        ng.addColorStop(1, hexShade(col, 0.5));
-        ctx.fillStyle = ng;
+        ctx.shadowColor = NAME_GLOW;
+        ctx.shadowBlur = a.persp * 10;
+        ctx.fillStyle = `rgba(${NAME_RGB}, ${alpha.toFixed(3)})`;
         ctx.fillText(a.name, a.x, a.y);
         ctx.shadowBlur = 0;
-        ctx.lineWidth = 0.6;
-        ctx.strokeStyle = 'rgba(255,255,255,' + (0.3 + depth * 0.4) + ')';
-        ctx.strokeText(a.name, a.x, a.y);
-        ctx.globalAlpha = 1;
       } else {
         // 未分配的槽位 = 球面上的光点（默认满屏光点，构成完整球体）
         const depth = (a.z + 1) / 2;
         const tw = 0.7 + 0.3 * Math.sin(now * 0.0022 + a.seed * 6.283);
         const rad = (1.1 + depth * 1.9) * a.persp;
-        let dotR = 150, dotG = 240, dotB = 255;   // 多数为青蓝，少数暖金/粉/绿，混合色彩
-        if (a.seed > 0.9)       { dotR = 255; dotG = 215; dotB = 120; }
-        else if (a.seed > 0.8)  { dotR = 255; dotG = 150; dotB = 210; }
-        else if (a.seed > 0.72) { dotR = 170; dotG = 255; dotB = 190; }
         const dotA = (0.16 + depth * 0.66) * tw;
         ctx.beginPath();
         ctx.arc(a.x, a.y, rad, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${dotR}, ${dotG}, ${dotB}, ${dotA})`;
-        ctx.shadowColor = `rgba(${dotR}, ${dotG}, ${dotB}, 0.9)`;
+        ctx.fillStyle = `rgba(${DOT_RGB}, ${dotA.toFixed(3)})`;
+        ctx.shadowColor = 'rgba(0, 242, 254, 0.9)';
         ctx.shadowBlur = depth * 9;
         ctx.fill();
         ctx.shadowBlur = 0;
       }
     }
+
+    drawOrbits(true, now);       // 球体前侧轨道线（压在点云上面，形成环绕感）
 
     // 彗星轨迹
     for (const f of flyers) {
@@ -1311,10 +1473,15 @@ if (isJoinMode) {
     const tm = COMM.lastSync ? new Date(COMM.lastSync).toLocaleTimeString('zh-CN', { hour12: false }) : '尚未';
     const tip = $('rz_commTip');
     if (tip) {
-      tip.innerHTML = '通道服务器：' + esc(COMM.server) + '　并行子通道：' + COMM.subs +
-        ' 条（实时在线 ' + live + '）　最近同步：' + tm +
-        '<br>子通道越多，可同时承载的登记人数越高：单条约支撑两三百人，' + COMM.subs +
-        ' 条即可支撑 ' + (COMM.subs * 200) + ' 人以上；且大屏每 20 秒按游标回补拉取，断线期间提交的登记也会自动补回。';
+      const rows = MQTT_BROKERS.map((br, bi) => {
+        const st = COMM.mqtt[bi];
+        const on = st && st.ok;
+        return '<span style="color:' + (on ? '#41ffb0' : '#7a9ec4') + '">' + br.name + (on ? ' ✓' : ' ·') + '</span>';
+      }).join('　');
+      tip.innerHTML = '通路 A（HTTP 推送）：' + esc(COMM.server) + '，' + COMM.subs + ' 条子通道，实时在线 ' + live + ' 条<br>' +
+        '通路 B（MQTT 网关）：' + (COMM.useMqtt ? rows : '已关闭') + '<br>' +
+        '最近同步：' + tm + '。两条通路并联，任意一路接通即可正常登记；手机端会同时投递两份，大屏按唯一编号去重，不会重复计人。' +
+        '若两路均不可达，请直接使用左侧“现场录入 / 批量导入”，抽奖逻辑完全一致。';
     }
 
     const kw = ($('rz_search').value || '').trim().toLowerCase();
@@ -1341,6 +1508,7 @@ if (isJoinMode) {
   function openRoster() {
     if ($('rz_server')) $('rz_server').value = COMM.server;
     if ($('rz_chsub')) $('rz_chsub').value = COMM.subs;
+    if ($('rz_mqtt')) $('rz_mqtt').checked = !!COMM.useMqtt;
     $('rosterModal').style.display = 'flex';
     renderRoster();
   }
@@ -1438,6 +1606,7 @@ if (isJoinMode) {
   $('rz_saveComm').onclick = () => {
     let sv = ($('rz_server').value || '').trim().replace(/\/+$/, '');
     const cs = parseInt($('rz_chsub').value, 10);
+    const useMqtt = $('rz_mqtt') ? !!$('rz_mqtt').checked : COMM.useMqtt;
     if (sv && !/^https?:\/\//.test(sv)) {
       if (/^[\w.-]+$/.test(sv)) sv = 'https://' + sv;
       else { showTip('通道服务器请填完整地址，如 https://ntfy.sh'); return; }
@@ -1447,14 +1616,15 @@ if (isJoinMode) {
     try {
       localStorage.setItem('lottery_comm_server', sv);
       localStorage.setItem('lottery_comm_subs', String(cs));
+      localStorage.setItem('lottery_comm_mqtt', useMqtt ? '1' : '0');
     } catch (e) {}
     COMM.server = sv;
     COMM.subs = cs;
+    COMM.useMqtt = useMqtt;
     restartComm();
     renderQR();
-    if (qrTips) qrTips.innerHTML = '微信 / 手机浏览器 扫码参与<br><span style="font-size:12px;color:#8fb8e0;word-break:break-all">' + buildJoinUrl() + '</span>';
     renderRoster();
-    showTip('通道已更新：' + sv + '（' + cs + ' 路），二维码已同步');
+    showTip('通道已更新：HTTP ' + cs + ' 路 + MQTT ' + (useMqtt ? MQTT_BROKERS.length + ' 个网关' : '已关闭'));
   };
 
   // --- 设置弹窗逻辑 ---
