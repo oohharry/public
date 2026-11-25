@@ -401,7 +401,12 @@ if (isJoinMode) {
       const y = 1 - (i / (MAX - 1)) * 2;
       const r = Math.sqrt(Math.max(0, 1 - y * y));
       const theta = Math.PI * (3 - Math.sqrt(5)) * i;
-      slots.push({ bx: Math.cos(theta) * r, by: y, bz: Math.sin(theta) * r, name: null });
+      slots.push({
+        bx: Math.cos(theta) * r, by: y, bz: Math.sin(theta) * r,
+        name: null, owner: null,
+        seed: Math.random(),          // 每个光点独立的闪烁相位
+        sx: 0, sy: 0, sz: 0, persp: 1 // 每帧缓存球面投影坐标，供“光点飞出”取起点
+      });
     }
     bgStars = [];
     for(let i=0; i<100; i++) {
@@ -411,6 +416,52 @@ if (isJoinMode) {
         speed: Math.random() * 0.5 + 0.1
       });
     }
+  }
+
+  // ===== 光点 ↔ 人名 的映射规则 =====
+  // 默认状态：整个球体全部由光点组成（不显示任何“等待登记”文字）。
+  // 每来一位登记人员，就把球面上“一个”光点替换成他/她的名字；
+  // 未登记到的槽位继续保留为光点，因此光点总数恒定、球体形状不变。
+  function assignNamesToSlots(pool) {
+    for (let i = 0; i < slots.length; i++) { slots[i].name = null; slots[i].owner = null; }
+    const n = Math.min(pool.length, slots.length);
+    if (n <= 0) return;
+    for (let k = 0; k < n; k++) {
+      let idx = Math.floor(k * slots.length / n) % slots.length;  // 均匀散布在球面
+      let guard = 0;
+      while (slots[idx].name !== null && guard < slots.length) {  // 防撞位
+        idx = (idx + 1) % slots.length; guard++;
+      }
+      slots[idx].name = pool[k].name;
+      slots[idx].owner = pool[k];
+    }
+  }
+
+  // 抽奖停止时，光点的飞行起点 = 该人员所占据的那个球面槽位的实时位置。
+  // 球体一直在旋转，且每人对应不同槽位，因此起点每轮都不同，绝不会固定在同一处。
+  // 按当前旋转角度实时算出某个槽位在屏幕上的位置（点击瞬间的真实位置）
+  function slotScreen(s) {
+    const cY = Math.cos(rotY), sY = Math.sin(rotY);
+    const cX = Math.cos(-0.18), sX = Math.sin(-0.18);
+    let x = s.bx * cY - s.bz * sY;
+    let z = s.bx * sY + s.bz * cY;
+    let y = s.by * cX - z * sX;
+    z = s.by * sX + z * cX;
+    const persp = 2.4 / (2.4 + z);
+    return { x: cx + x * R * persp, y: cy + y * R * persp };
+  }
+
+  function slotOriginFor(name) {
+    if (name) {
+      for (const s of slots) {
+        if (s.name === name) { s.name = null; s.owner = null; return slotScreen(s); }
+      }
+    }
+    const free = [];
+    for (let i = 0; i < slots.length; i++) if (!slots[i].name) free.push(i);
+    if (!free.length) return { x: cx + (rf() - 0.5) * W * 0.8, y: cy + (rf() - 0.5) * H * 0.8 };
+    const hit = slots[free[secureRandInt(free.length)]];   // 兜底：随机挑一个空闲光点
+    return slotScreen(hit);
   }
 
   function resize() {
@@ -531,8 +582,8 @@ if (isJoinMode) {
     const arr = [];
     
     ensureSlotCapacity();
-    let pool = participants.filter(p => !p.won);
-    let displayNames = pool.map(p => p.name);
+    const pool = participants.filter(p => !p.won);
+    assignNamesToSlots(pool);   // 无人登记 → 全部是光点；有人登记 → 光点逐个替换成人名
     
     for (let i = 0; i < MAX; i++) {
       const s = slots[i];
@@ -542,24 +593,13 @@ if (isJoinMode) {
       z = s.by * sinX + z * cosX;
       
       const persp = 2.4 / (2.4 + z);
-      
-      let name = null;
-      if (participants.length === 0) {
-        // 无人登记：整个球面铺满“等待登记...”
-        name = "等待登记...";
-      } else if (displayNames.length > 0) {
-        // 一旦有人登记，立即不再显示“等待登记”，改为真实姓名；
-        // 槽位与登记人员一一对应，剩余槽位用姓名循环补齐，保证人人上墙
-        name = displayNames[i] || displayNames[i % displayNames.length];
-      } else {
-        // 全部人员均已中奖：文字清空，只保留光点
-        name = null;
-      }
 
-      arr.push({
-        x: cx + x * R * persp, y: cy + y * R * persp,
-        z: z, persp: persp, name: name
-      });
+      s.sx = cx + x * R * persp;
+      s.sy = cy + y * R * persp;
+      s.sz = z;
+      s.persp = persp;
+
+      arr.push({ x: s.sx, y: s.sy, z: z, persp: persp, name: s.name, seed: s.seed });
     }
     
     arr.sort((a, b) => a.z - b.z);
@@ -578,12 +618,17 @@ if (isJoinMode) {
         ctx.fillText(a.name, a.x, a.y);
         ctx.shadowBlur = 0;
       } else {
-        // 没有名字的槽位画微弱光点
+        // 未分配的槽位 = 球面上的光点（默认满屏光点，构成完整球体）
         const depth = (a.z + 1) / 2;
-        ctx.fillStyle = `rgba(0, 242, 254, ${0.05 + depth * 0.1})`;
+        const tw = 0.7 + 0.3 * Math.sin(now * 0.0022 + a.seed * 6.283);
+        const rad = (1.1 + depth * 1.9) * a.persp;
         ctx.beginPath();
-        ctx.arc(a.x, a.y, 1.5 * a.persp, 0, Math.PI*2);
+        ctx.arc(a.x, a.y, rad, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(150, 240, 255, ${(0.16 + depth * 0.66) * tw})`;
+        ctx.shadowColor = 'rgba(0, 242, 254, 0.9)';
+        ctx.shadowBlur = depth * 9;
         ctx.fill();
+        ctx.shadowBlur = 0;
       }
     }
 
@@ -789,13 +834,15 @@ if (isJoinMode) {
     const now = performance.now();
     
     picked.forEach((p, index) => {
+      // 起点 = 该中奖者对应光点此刻在球面上的真实位置（随球体旋转，逐轮不同）
+      const origin = slotOriginFor(p.name);
       flyers.push({
         name: p.name,
-        start: { x: cx + (rf()-0.5)*W*0.9, y: cy + (rf()-0.5)*H*0.9 },
+        start: { x: origin.x, y: origin.y },
         end: { x: cx, y: cy },
-        cp: { x: cx + (rf()-0.5)*W*0.5, y: cy + (rf()-0.5)*H*0.5 },
-        startAt: now + 800 + index * 200, 
-        duration: 2500,
+        cp: { x: cx + (rf()-0.5)*R*2.4, y: cy + (rf()-0.5)*R*2.0 },  // 控制点同样随机
+        startAt: now + 700 + index * (140 + secureRandInt(160)),
+        duration: 1800 + secureRandInt(1200),                        // 飞行时长随机，节奏不重复
         arrived: false,
         pos: null,
         trail: []
