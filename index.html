@@ -24,7 +24,6 @@ header{height:70px;display:flex;align-items:center;justify-content:space-between
 
 main{flex:1;display:flex;min-height:0}
 .left{width:280px;background:linear-gradient(180deg, rgba(8,20,40,.8), rgba(3,6,16,.9));padding:15px;border-right:1px solid rgba(90,170,255,.2);overflow-y:auto;backdrop-filter:blur(5px)}
-/* 隐藏左侧和右侧滚动条，防变形 */
 .left::-webkit-scrollbar, .right::-webkit-scrollbar { display: none; }
 .left, .right { -ms-overflow-style: none; scrollbar-width: none; }
 
@@ -43,6 +42,9 @@ canvas{display:block;width:100%;height:100%}
 .prize-btn:not(.done):hover{border-color:#00f2fe;box-shadow:0 0 15px rgba(0,242,254,.4)}
 .prize-btn.active{border-color:#ffd700;background:rgba(60,50,10,.6);box-shadow:0 0 20px rgba(255,215,0,.4);color:#ffd700;text-shadow:0 0 10px rgba(255,215,0,.5)}
 .prize-btn.done{opacity:.2;cursor:not-allowed;filter:grayscale(1)}
+/* 抽奖时禁止点击 */
+.is-drawing .prize-btn { pointer-events: none; opacity: 0.5; }
+
 .batch-row{display:flex;align-items:center;justify-content:space-between;font-size:15px;color:#bfe0ff;margin-top:10px;padding:10px 0;border-top:1px solid rgba(90,170,255,.2)}
 .batch-row input{width:60px;height:34px;border-radius:6px;border:1px solid rgba(0,242,254,.3);background:#07111f;color:#00f2fe;font-size:18px;font-weight:bold;text-align:center;outline:none}
 .controls{display:flex;flex-direction:column;gap:12px;margin-top:auto}
@@ -378,8 +380,8 @@ if (isJoinMode) {
 
       if (t >= 1 && !f.arrived) {
         f.arrived = true;
-        // 修复：初始大小设为 0.5，并设定 3 秒的停留时间
-        centerWinners.push({ name: f.name, born: now, expire: now + 3000 });
+        // 停留时间延长到 5 秒
+        centerWinners.push({ name: f.name, born: now, expire: now + 5000 });
         createSparks(cx, cy, '#00f2fe'); 
         createSparks(cx, cy, '#ffd700');
       }
@@ -391,12 +393,12 @@ if (isJoinMode) {
       if (now > centerWinners[0].expire) {
         centerWinners.shift(); 
         if (centerWinners.length > 0) {
-          // 如果队列里还有下一个名字，重置倒计时，开始显示下一个
           centerWinners[0].born = now;
-          centerWinners[0].expire = now + 3000;
+          centerWinners[0].expire = now + 5000; // 下一个继续保持 5 秒
         } else {
-          // 所有动画完成
+          // 所有动画完成，解除右侧按钮锁定
           state = 'idle';
+          document.querySelector('.right').classList.remove('is-drawing');
           $('stopBtn').disabled = true;
           $('startBtn').disabled = false;
           renderPrizeList();
@@ -425,7 +427,7 @@ if (isJoinMode) {
       bg.addColorStop(0, `rgba(0, 242, 254, ${0.15 + pulse*0.1})`);
       bg.addColorStop(1, 'rgba(0, 0, 0, 0)');
     } else if (centerWinners.length > 0) {
-      bg.addColorStop(0, 'rgba(255, 215, 0, 0.2)'); 
+      bg.addColorStop(0, 'rgba(255, 215, 0, 0.25)'); 
       bg.addColorStop(1, 'rgba(0, 0, 0, 0)');
     } else {
       bg.addColorStop(0, 'rgba(0, 242, 254, 0.05)');
@@ -438,8 +440,9 @@ if (isJoinMode) {
     const cosX = Math.cos(-0.18), sinX = Math.sin(-0.18);
     const arr = [];
     
+    // 修复重叠 Bug：只渲染实际的未中奖人员，不再用 i % length 填满
     let pool = participants.filter(p => !p.won);
-    let displayNames = pool.length > 0 ? pool.map(p => p.name) : Array(30).fill("等待登记...");
+    let displayNames = pool.length > 0 ? pool.map(p => p.name) : null;
     
     for (let i = 0; i < MAX; i++) {
       const s = slots[i];
@@ -449,17 +452,26 @@ if (isJoinMode) {
       z = s.by * sinX + z * cosX;
       
       const persp = 2.4 / (2.4 + z);
+      
+      // 名字逻辑：
+      // 如果未中奖名单为空，且是前 30 个槽位，显示“等待登记”
+      // 如果未中奖名单不为空，按索引取名字，超出范围显示为空（这样不会重叠拥挤）
+      let name = null;
+      if (!displayNames) {
+        if (i < 30) name = "等待登记...";
+      } else {
+        name = displayNames[i] || null;
+      }
+
       arr.push({
         x: cx + x * R * persp, y: cy + y * R * persp,
-        z: z, persp: persp, name: displayNames[i % displayNames.length] || null
+        z: z, persp: persp, name: name
       });
     }
     
     arr.sort((a, b) => a.z - b.z);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    
-    // 已移除：绘制外围光环的代码
 
     for (const a of arr) {
       if (a.name) {
@@ -472,6 +484,13 @@ if (isJoinMode) {
         ctx.fillStyle = `rgba(220, 240, 255, ${alpha})`;
         ctx.fillText(a.name, a.x, a.y);
         ctx.shadowBlur = 0;
+      } else if (i < 200) {
+        // 名字为空的地方画一些微弱的光点代替，避免球体太空
+        const depth = (a.z + 1) / 2;
+        ctx.fillStyle = `rgba(0, 242, 254, ${0.05 + depth * 0.1})`;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, 1.5 * a.persp, 0, Math.PI*2);
+        ctx.fill();
       }
     }
 
@@ -516,19 +535,33 @@ if (isJoinMode) {
     ctx.globalAlpha = 1;
     ctx.shadowBlur = 0;
 
-    // 中心名字极度高亮
+    // ======== 中心名字超强高亮渲染 ========
     if (centerWinners.length > 0) {
       const w = centerWinners[0];
       const age = (now - w.born) / 1000;
       
-      // 1. 中心聚光灯特效（背景泛金）
-      const spotlight = ctx.createRadialGradient(cx, cy, 0, cx, cy, 450);
-      spotlight.addColorStop(0, 'rgba(255, 215, 0, 0.3)');
-      spotlight.addColorStop(1, 'rgba(255, 215, 0, 0)');
+      // 1. 强烈聚光灯背景
+      const spotlight = ctx.createRadialGradient(cx, cy, 0, cx, cy, 500);
+      spotlight.addColorStop(0, 'rgba(255, 215, 0, 0.4)');
+      spotlight.addColorStop(0.5, 'rgba(0, 242, 254, 0.1)');
+      spotlight.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = spotlight;
       ctx.fillRect(0, 0, W, H);
 
-      // 2. 弹射放大逻辑：0~0.3秒内从 0.5 放大到 1.1，之后轻微回弹
+      // 2. 环绕流光星环
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(age * 0.5); // 旋转
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 250, 80, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = 20;
+      ctx.stroke();
+      ctx.restore();
+
+      // 3. 弹射放大逻辑
       let scale = 1;
       if (age < 0.3) {
         scale = 0.5 + (age / 0.3) * 0.6;
@@ -540,31 +573,31 @@ if (isJoinMode) {
       ctx.translate(cx, cy);
       ctx.scale(scale, scale);
       
-      ctx.font = '900 120px "Microsoft YaHei"';
+      ctx.font = '900 130px "Microsoft YaHei"';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       
-      // 第一层：青色外发光
+      // 第一层：青色巨大外发光
       ctx.shadowColor = '#00f2fe';
-      ctx.shadowBlur = 100;
+      ctx.shadowBlur = 120;
       ctx.fillStyle = '#fff';
       ctx.fillText(w.name, 0, 0);
       
       // 第二层：金色描边
-      ctx.lineWidth = 5;
+      ctx.lineWidth = 6;
       ctx.strokeStyle = '#ffd700';
       ctx.strokeText(w.name, 0, 0);
       
       // 第三层：金色渐变填充
-      const grad = ctx.createLinearGradient(0, -60, 0, 60);
+      const grad = ctx.createLinearGradient(0, -70, 0, 70);
       grad.addColorStop(0, '#ffffff');
-      grad.addColorStop(0.3, '#fff8b0');
-      grad.addColorStop(0.7, '#ffd700');
+      grad.addColorStop(0.2, '#fff8b0');
+      grad.addColorStop(0.8, '#ffd700');
       grad.addColorStop(1, '#ff8c00');
       ctx.fillStyle = grad;
       
       // 第四层：中心强烈高光
-      ctx.shadowBlur = 30;
+      ctx.shadowBlur = 40;
       ctx.shadowColor = '#ffd700';
       ctx.fillText(w.name, 0, 0);
       
@@ -601,13 +634,13 @@ if (isJoinMode) {
   }
 
   window.selectPrize = (id) => {
-    if (state !== 'idle') return;
+    if (state !== 'idle') return; // 双重保险，防止函数被意外调用
     currentPrizeId = id;
     renderPrizeList();
   };
 
   function renderWinners() {
-    // 倒序排列：最新的中奖者显示在最上面
+    // 倒序排列
     $('winnerList').innerHTML = [...winners].reverse().map(w => 
       `<div class="winner-item"><span>${w.prize}</span><b>${w.name}</b></div>`
     ).join('') || '<div style="color:#6f8fb0;text-align:center;font-size:12px;margin-top:20px">暂无中奖记录</div>';
@@ -622,7 +655,10 @@ if (isJoinMode) {
     targetSpeed = 3.5;
     $('startBtn').disabled = true;
     $('stopBtn').disabled = false;
-    centerWinners = []; // 清空上一次的显示
+    centerWinners = []; 
+    
+    // 锁定右侧奖项面板
+    document.querySelector('.right').classList.add('is-drawing');
   };
 
   $('stopBtn').onclick = () => {
@@ -635,7 +671,11 @@ if (isJoinMode) {
     const pool = participants.filter(p => !p.won);
     
     if (!prize || pool.length === 0) {
-      setTimeout(() => { state = 'idle'; $('startBtn').disabled = false; }, 1000);
+      setTimeout(() => { 
+        state = 'idle'; 
+        $('startBtn').disabled = false; 
+        document.querySelector('.right').classList.remove('is-drawing');
+      }, 1000);
       return;
     }
 
@@ -643,7 +683,11 @@ if (isJoinMode) {
     batch = Math.min(batch, prize.quota - prize.drawn, pool.length);
     
     if (batch <= 0) {
-      setTimeout(() => { state = 'idle'; $('startBtn').disabled = false; }, 1000);
+      setTimeout(() => { 
+        state = 'idle'; 
+        $('startBtn').disabled = false; 
+        document.querySelector('.right').classList.remove('is-drawing');
+      }, 1000);
       return;
     }
 
