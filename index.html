@@ -42,7 +42,6 @@ canvas{display:block;width:100%;height:100%}
 .prize-btn:not(.done):hover{border-color:#00f2fe;box-shadow:0 0 15px rgba(0,242,254,.4)}
 .prize-btn.active{border-color:#ffd700;background:rgba(60,50,10,.6);box-shadow:0 0 20px rgba(255,215,0,.4);color:#ffd700;text-shadow:0 0 10px rgba(255,215,0,.5)}
 .prize-btn.done{opacity:.2;cursor:not-allowed;filter:grayscale(1)}
-/* 抽奖时禁止点击 */
 .is-drawing .prize-btn { pointer-events: none; opacity: 0.5; }
 
 .batch-row{display:flex;align-items:center;justify-content:space-between;font-size:15px;color:#bfe0ff;margin-top:10px;padding:10px 0;border-top:1px solid rgba(90,170,255,.2)}
@@ -380,7 +379,7 @@ if (isJoinMode) {
 
       if (t >= 1 && !f.arrived) {
         f.arrived = true;
-        // 停留时间延长到 5 秒
+        // 停留 5 秒
         centerWinners.push({ name: f.name, born: now, expire: now + 5000 });
         createSparks(cx, cy, '#00f2fe'); 
         createSparks(cx, cy, '#ffd700');
@@ -394,7 +393,7 @@ if (isJoinMode) {
         centerWinners.shift(); 
         if (centerWinners.length > 0) {
           centerWinners[0].born = now;
-          centerWinners[0].expire = now + 5000; // 下一个继续保持 5 秒
+          centerWinners[0].expire = now + 5000;
         } else {
           // 所有动画完成，解除右侧按钮锁定
           state = 'idle';
@@ -440,9 +439,8 @@ if (isJoinMode) {
     const cosX = Math.cos(-0.18), sinX = Math.sin(-0.18);
     const arr = [];
     
-    // 修复重叠 Bug：只渲染实际的未中奖人员，不再用 i % length 填满
     let pool = participants.filter(p => !p.won);
-    let displayNames = pool.length > 0 ? pool.map(p => p.name) : null;
+    let displayNames = pool.map(p => p.name);
     
     for (let i = 0; i < MAX; i++) {
       const s = slots[i];
@@ -453,13 +451,12 @@ if (isJoinMode) {
       
       const persp = 2.4 / (2.4 + z);
       
-      // 名字逻辑：
-      // 如果未中奖名单为空，且是前 30 个槽位，显示“等待登记”
-      // 如果未中奖名单不为空，按索引取名字，超出范围显示为空（这样不会重叠拥挤）
       let name = null;
-      if (!displayNames) {
-        if (i < 30) name = "等待登记...";
+      if (participants.length === 0) {
+        // 如果没有任何人登记，铺满“等待登记...”
+        name = "等待登记...";
       } else {
+        // 如果已登记，按索引显示名字。如果池子里没人了，显示为空，靠光点填补
         name = displayNames[i] || null;
       }
 
@@ -484,8 +481,8 @@ if (isJoinMode) {
         ctx.fillStyle = `rgba(220, 240, 255, ${alpha})`;
         ctx.fillText(a.name, a.x, a.y);
         ctx.shadowBlur = 0;
-      } else if (i < 200) {
-        // 名字为空的地方画一些微弱的光点代替，避免球体太空
+      } else {
+        // 没有名字的槽位画微弱光点
         const depth = (a.z + 1) / 2;
         ctx.fillStyle = `rgba(0, 242, 254, ${0.05 + depth * 0.1})`;
         ctx.beginPath();
@@ -540,7 +537,6 @@ if (isJoinMode) {
       const w = centerWinners[0];
       const age = (now - w.born) / 1000;
       
-      // 1. 强烈聚光灯背景
       const spotlight = ctx.createRadialGradient(cx, cy, 0, cx, cy, 500);
       spotlight.addColorStop(0, 'rgba(255, 215, 0, 0.4)');
       spotlight.addColorStop(0.5, 'rgba(0, 242, 254, 0.1)');
@@ -548,10 +544,9 @@ if (isJoinMode) {
       ctx.fillStyle = spotlight;
       ctx.fillRect(0, 0, W, H);
 
-      // 2. 环绕流光星环
       ctx.save();
       ctx.translate(cx, cy);
-      ctx.rotate(age * 0.5); // 旋转
+      ctx.rotate(age * 0.5); 
       ctx.beginPath();
       ctx.ellipse(0, 0, 250, 80, 0, 0, Math.PI * 2);
       ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
@@ -561,7 +556,6 @@ if (isJoinMode) {
       ctx.stroke();
       ctx.restore();
 
-      // 3. 弹射放大逻辑
       let scale = 1;
       if (age < 0.3) {
         scale = 0.5 + (age / 0.3) * 0.6;
@@ -577,18 +571,15 @@ if (isJoinMode) {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       
-      // 第一层：青色巨大外发光
       ctx.shadowColor = '#00f2fe';
       ctx.shadowBlur = 120;
       ctx.fillStyle = '#fff';
       ctx.fillText(w.name, 0, 0);
       
-      // 第二层：金色描边
       ctx.lineWidth = 6;
       ctx.strokeStyle = '#ffd700';
       ctx.strokeText(w.name, 0, 0);
       
-      // 第三层：金色渐变填充
       const grad = ctx.createLinearGradient(0, -70, 0, 70);
       grad.addColorStop(0, '#ffffff');
       grad.addColorStop(0.2, '#fff8b0');
@@ -596,7 +587,6 @@ if (isJoinMode) {
       grad.addColorStop(1, '#ff8c00');
       ctx.fillStyle = grad;
       
-      // 第四层：中心强烈高光
       ctx.shadowBlur = 40;
       ctx.shadowColor = '#ffd700';
       ctx.fillText(w.name, 0, 0);
@@ -634,13 +624,12 @@ if (isJoinMode) {
   }
 
   window.selectPrize = (id) => {
-    if (state !== 'idle') return; // 双重保险，防止函数被意外调用
+    if (state !== 'idle') return;
     currentPrizeId = id;
     renderPrizeList();
   };
 
   function renderWinners() {
-    // 倒序排列
     $('winnerList').innerHTML = [...winners].reverse().map(w => 
       `<div class="winner-item"><span>${w.prize}</span><b>${w.name}</b></div>`
     ).join('') || '<div style="color:#6f8fb0;text-align:center;font-size:12px;margin-top:20px">暂无中奖记录</div>';
@@ -657,7 +646,6 @@ if (isJoinMode) {
     $('stopBtn').disabled = false;
     centerWinners = []; 
     
-    // 锁定右侧奖项面板
     document.querySelector('.right').classList.add('is-drawing');
   };
 
@@ -774,6 +762,12 @@ if (isJoinMode) {
 
   $('savePrizesBtn').onclick = () => {
     collectEditor();
+    
+    // 修复：保存奖项时，重置所有人的中奖状态并清空名单
+    prizes.forEach(p => p.drawn = 0);
+    participants.forEach(p => p.won = false); 
+    winners = [];
+    
     saveData();
     currentPrizeId = null;
     renderUI();
@@ -783,6 +777,7 @@ if (isJoinMode) {
   $('resetBtn').onclick = () => {
     if (!confirm('确定要清空所有已抽奖项数量，并清空中奖名单吗？')) return;
     prizes.forEach(p => p.drawn = 0);
+    participants.forEach(p => p.won = false); // 修复：同时重置人员的未中奖状态
     winners = [];
     saveData();
     renderUI();
