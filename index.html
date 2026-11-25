@@ -7,79 +7,82 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{background:#02050a;color:#eaf4ff;font-family:"Microsoft YaHei",sans-serif;overflow:hidden}
+body{background:#030610;color:#eaf4ff;font-family:"Microsoft YaHei",sans-serif;overflow:hidden}
 
 /* ---------- 大屏端样式 ---------- */
 #screen{height:100vh;display:flex;flex-direction:column;position:relative;z-index:10}
-header{height:70px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid rgba(90,170,255,.15);background:rgba(8,20,40,.8);backdrop-filter:blur(10px)}
-.brand{font-size:32px;font-weight:800;letter-spacing:4px;background:linear-gradient(90deg,#9fd8ff,#4fa8ff,#a0e0ff);-webkit-background-clip:text;color:transparent;text-shadow:0 0 20px rgba(90,170,255,.5)}
+header{height:70px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid rgba(90,170,255,.2);background:rgba(8,20,40,.7);backdrop-filter:blur(10px)}
+.brand{font-size:32px;font-weight:900;letter-spacing:4px;background:linear-gradient(90deg,#00f2fe,#4facfe,#00f2fe);-webkit-background-clip:text;color:transparent;text-shadow:0 0 20px rgba(0,242,254,.4)}
 .header-right{display:flex;align-items:center;gap:20px}
 .count{font-size:18px;color:#bfe0ff}
-.count span{font-size:36px;font-weight:bold;color:#fff;margin:0 5px;text-shadow:0 0 15px #4fa8ff}
-#showQrBtn{height:44px;padding:0 20px;border-radius:8px;background:linear-gradient(180deg,#8fd3ff,#3d9dff);color:#04101f;font-size:16px;font-weight:bold;cursor:pointer;border:none;box-shadow:0 4px 15px rgba(61,157,255,.4)}
-#settingBtn{height:36px;padding:0 15px;border:1px solid rgba(120,190,255,.4);border-radius:8px;background:rgba(40,90,150,.3);color:#9fd8ff;font-size:14px;cursor:pointer}
-#bgmBtn{height:36px;width:36px;border-radius:50%;border:1px solid rgba(120,190,255,.4);background:rgba(40,90,150,.3);color:#9fd8ff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.count span{font-size:36px;font-weight:bold;color:#fff;margin:0 5px;text-shadow:0 0 20px #00f2fe, 0 0 40px #00f2fe}
+#showQrBtn{height:44px;padding:0 20px;border-radius:8px;background:linear-gradient(180deg,#00f2fe,#4facfe);color:#030610;font-size:16px;font-weight:bold;cursor:pointer;border:none;box-shadow:0 4px 15px rgba(0,242,254,.4);transition:.2s}
+#showQrBtn:active{transform:scale(0.95)}
+#settingBtn{height:36px;padding:0 15px;border:1px solid rgba(0,242,254,.5);border-radius:8px;background:rgba(0,242,254,.1);color:#00f2fe;font-size:14px;cursor:pointer;transition:.2s}
+#settingBtn:hover{background:rgba(0,242,254,.2)}
+#bgmBtn{height:36px;width:36px;border-radius:50%;border:1px solid rgba(0,242,254,.5);background:rgba(0,242,254,.1);color:#00f2fe;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 
 main{flex:1;display:flex;min-height:0}
-.left{width:280px;background:rgba(5,12,24,.85);padding:15px;border-right:1px solid rgba(90,170,255,.15);overflow-y:auto;backdrop-filter:blur(5px)}
-.left h3{margin-bottom:15px;font-size:16px;text-align:center;color:#8fb8e0;letter-spacing:2px}
-.winner-item{background:linear-gradient(90deg,rgba(20,40,70,.8),rgba(10,20,40,.4));padding:10px;margin-bottom:8px;border-radius:6px;border-left:3px solid #5db4ff;display:flex;justify-content:space-between;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.left{width:280px;background:linear-gradient(180deg, rgba(8,20,40,.8), rgba(3,6,16,.9));padding:15px;border-right:1px solid rgba(90,170,255,.2);overflow-y:auto;backdrop-filter:blur(5px)}
+.left h3{margin-bottom:15px;font-size:16px;text-align:center;color:#00f2fe;letter-spacing:2px;text-shadow:0 0 10px rgba(0,242,254,.5)}
+.winner-item{background:linear-gradient(90deg,rgba(0,242,254,.15),rgba(10,20,40,.4));padding:10px;margin-bottom:8px;border-radius:6px;border-left:3px solid #00f2fe;display:flex;justify-content:space-between;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.3)}
 .winner-item span{color:#8fb8e0}
-.winner-item b{color:#ffd700}
-.canvas-box{flex:1;position:relative;overflow:hidden;background:#02050a}
+.winner-item b{color:#ffd700;text-shadow:0 0 8px rgba(255,215,0,.5)}
+
+.canvas-box{flex:1;position:relative;overflow:hidden;background:#030610}
 canvas{display:block;width:100%;height:100%}
 
 /* 右侧操作区 */
-.right{width:280px;background:rgba(5,12,24,.85);padding:20px;border-left:1px solid rgba(90,170,255,.15);display:flex;flex-direction:column;gap:12px;backdrop-filter:blur(5px)}
-.prize-btn{padding:14px;border-radius:8px;border:1px solid rgba(90,170,255,.2);background:rgba(15,30,55,.7);cursor:pointer;text-align:center;font-size:16px;font-weight:bold;transition:.3s;position:relative;overflow:hidden}
-.prize-btn:not(.done):hover{border-color:#5db4ff;box-shadow:0 0 15px rgba(90,170,255,.4)}
-.prize-btn.active{border-color:#ffd700;background:rgba(60,50,10,.6);box-shadow:0 0 20px rgba(255,215,0,.4);color:#ffd700}
+.right{width:280px;background:linear-gradient(180deg, rgba(8,20,40,.8), rgba(3,6,16,.9));padding:20px;border-left:1px solid rgba(90,170,255,.2);display:flex;flex-direction:column;gap:12px;backdrop-filter:blur(5px)}
+.prize-btn{padding:14px;border-radius:8px;border:1px solid rgba(0,242,254,.2);background:rgba(15,30,55,.7);cursor:pointer;text-align:center;font-size:16px;font-weight:bold;transition:.3s;position:relative;overflow:hidden}
+.prize-btn:not(.done):hover{border-color:#00f2fe;box-shadow:0 0 15px rgba(0,242,254,.4)}
+.prize-btn.active{border-color:#ffd700;background:rgba(60,50,10,.6);box-shadow:0 0 20px rgba(255,215,0,.4);color:#ffd700;text-shadow:0 0 10px rgba(255,215,0,.5)}
 .prize-btn.done{opacity:.3;cursor:not-allowed;filter:grayscale(1)}
 .batch-row{display:flex;align-items:center;justify-content:space-between;font-size:15px;color:#bfe0ff;margin-top:10px;padding:10px 0;border-top:1px solid rgba(90,170,255,.2)}
-.batch-row input{width:60px;height:34px;border-radius:6px;border:1px solid rgba(120,190,255,.3);background:#07111f;color:#fff;font-size:16px;text-align:center;outline:none}
+.batch-row input{width:60px;height:34px;border-radius:6px;border:1px solid rgba(0,242,254,.3);background:#07111f;color:#00f2fe;font-size:18px;font-weight:bold;text-align:center;outline:none}
 .controls{display:flex;flex-direction:column;gap:12px;margin-top:auto}
 .controls button{height:56px;border:none;border-radius:10px;font-size:20px;font-weight:bold;cursor:pointer;transition:.2s;letter-spacing:2px}
-#startBtn{background:linear-gradient(180deg,#8fd3ff,#3d9dff);color:#04101f;box-shadow:0 0 20px rgba(61,157,255,.4)}
+#startBtn{background:linear-gradient(180deg,#00f2fe,#4facfe);color:#030610;box-shadow:0 0 20px rgba(0,242,254,.4)}
 #startBtn:active{transform:scale(0.98)}
 #stopBtn{background:linear-gradient(180deg,#ffb36b,#ff5e3d);color:#2a0500;box-shadow:0 0 20px rgba(255,94,61,.4)}
 #stopBtn:disabled{opacity:.3;cursor:not-allowed;box-shadow:none}
 
 /* ---------- 放大二维码弹窗 ---------- */
-#qrModal{position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:200;cursor:pointer;backdrop-filter:blur(5px)}
-.qr-container{background:#fff;padding:30px;border-radius:20px;box-shadow:0 0 80px rgba(90,170,255,.6);display:flex;flex-direction:column;align-items:center;animation:popIn .4s cubic-bezier(0.175, 0.885, 0.32, 1.275)}
+#qrModal{position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:200;cursor:pointer;backdrop-filter:blur(8px)}
+.qr-container{background:#fff;padding:30px;border-radius:20px;box-shadow:0 0 100px rgba(0,242,254,.8);display:flex;flex-direction:column;align-items:center;animation:popIn .4s cubic-bezier(0.175, 0.885, 0.32, 1.275)}
 @keyframes popIn{from{transform:scale(0.6);opacity:0}to{transform:scale(1);opacity:1}}
 #bigQrcode img{width:360px;height:360px;display:block}
 .qr-tips{margin-top:25px;font-size:28px;font-weight:900;color:#0f1a2e;letter-spacing:4px}
-.qr-subtips{margin-top:40px;font-size:20px;color:#8fb8e0;animation:blink 1.5s infinite}
+.qr-subtips{margin-top:40px;font-size:20px;color:#00f2fe;animation:blink 1.5s infinite;text-shadow:0 0 10px rgba(0,242,254,.5)}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* ---------- 手机登记页样式 ---------- */
-#mobile{display:none;height:100vh;align-items:center;justify-content:center;padding:20px;background:radial-gradient(circle at 50% 20%,#12305a,#05080f 70%)}
-.card{width:100%;max-width:360px;background:#0f1a2e;border:1px solid rgba(100,180,255,.3);border-radius:16px;padding:30px 20px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.5)}
-.card h2{margin-bottom:10px;color:#fff;font-size:24px}
+#mobile{display:none;height:100vh;align-items:center;justify-content:center;padding:20px;background:radial-gradient(circle at 50% 20%,#0a1c3a,#030610 70%)}
+.card{width:100%;max-width:360px;background:rgba(15,26,46,.9);border:1px solid rgba(0,242,254,.3);border-radius:16px;padding:30px 20px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.5), inset 0 0 20px rgba(0,242,254,.1)}
+.card h2{margin-bottom:10px;color:#00f2fe;font-size:24px;text-shadow:0 0 10px rgba(0,242,254,.4)}
 .card p{color:#8fb8e0;font-size:14px;margin-bottom:25px}
-.card input{width:100%;height:50px;margin-bottom:15px;border-radius:8px;border:1px solid rgba(120,190,255,.3);background:#07111f;color:#fff;font-size:16px;padding:0 15px;outline:none;transition:.2s}
-.card input:focus{border-color:#5db4ff;box-shadow:0 0 10px rgba(90,170,255,.3)}
-.card button{width:100%;height:50px;border:none;border-radius:8px;background:linear-gradient(180deg,#8fd3ff,#3d9dff);color:#04101f;font-size:18px;font-weight:bold;cursor:pointer;margin-top:10px}
+.card input{width:100%;height:50px;margin-bottom:15px;border-radius:8px;border:1px solid rgba(0,242,254,.3);background:#030610;color:#fff;font-size:16px;padding:0 15px;outline:none;transition:.2s}
+.card input:focus{border-color:#00f2fe;box-shadow:0 0 15px rgba(0,242,254,.3)}
+.card button{width:100%;height:50px;border:none;border-radius:8px;background:linear-gradient(180deg,#00f2fe,#4facfe);color:#030610;font-size:18px;font-weight:bold;cursor:pointer;margin-top:10px}
 .card button:disabled{opacity:.5}
-#msg{margin-top:15px;font-size:14px;color:#9fe0a0;min-height:20px}
+#msg{margin-top:15px;font-size:14px;color:#00f2fe;min-height:20px}
 
 /* ---------- 设置弹窗 ---------- */
 #modalOverlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(5px)}
-#modal{width:500px;max-width:90vw;background:#0f1a2e;border:1px solid rgba(90,170,255,.3);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.8)}
-.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid rgba(90,170,255,.2)}
-.modal-header h3{margin:0;color:#fff;font-size:18px}
+#modal{width:500px;max-width:90vw;background:#0f1a2e;border:1px solid rgba(0,242,254,.3);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.8)}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid rgba(0,242,254,.2)}
+.modal-header h3{margin:0;color:#00f2fe;font-size:18px}
 .close-btn{background:none;border:none;color:#8fb8e0;font-size:24px;cursor:pointer}
 .prize-edit-row{display:flex;gap:10px;margin-bottom:10px;align-items:center}
-.prize-edit-row input{height:38px;border-radius:6px;border:1px solid rgba(120,190,255,.3);background:#07111f;color:#fff;padding:0 10px;outline:none;font-size:14px}
+.prize-edit-row input{height:38px;border-radius:6px;border:1px solid rgba(0,242,254,.3);background:#07111f;color:#fff;padding:0 10px;outline:none;font-size:14px}
 .prize-edit-row .ename{flex:1}
 .prize-edit-row .equota{width:80px}
-.prize-edit-row .edel{width:38px;height:38px;border:none;border-radius:6px;background:rgba(120,40,40,.6);color:#ffbaba;cursor:pointer;font-size:20px;line-height:1}
+.prize-edit-row .edel{width:38px;height:38px;border:none;border-radius:6px;background:rgba(255,94,61,.2);color:#ff5e3d;cursor:pointer;font-size:20px;line-height:1}
 .modal-actions{display:flex;gap:10px;margin-top:20px}
 .modal-actions button{flex:1;height:42px;border:none;border-radius:6px;cursor:pointer;font-size:15px;font-weight:bold}
-#addPrizeBtn{background:#2a5a8a;color:#fff}
-#savePrizesBtn{background:linear-gradient(180deg,#8fd3ff,#3d9dff);color:#04101f}
-#resetBtn{background:rgba(120,40,40,.6);color:#ffbaba;margin-top:10px;width:100%;height:38px;border:none;border-radius:6px;cursor:pointer;font-size:14px}
+#addPrizeBtn{background:rgba(0,242,254,.2);color:#00f2fe}
+#savePrizesBtn{background:linear-gradient(180deg,#00f2fe,#4facfe);color:#030610}
+#resetBtn{background:rgba(255,94,61,.2);color:#ff5e3d;margin-top:10px;width:100%;height:38px;border:none;border-radius:6px;cursor:pointer;font-size:14px}
 </style>
 </head>
 <body>
@@ -90,7 +93,7 @@ canvas{display:block;width:100%;height:100%}
 <!-- 大屏界面 -->
 <div id="screen">
   <header>
-    <div class="brand">幸运抽奖</div>
+    <div class="brand">LUCKY DRAW</div>
     <div class="header-right">
       <div class="count">已参与 <span id="totalCount">0</span> 人</div>
       <button id="bgmBtn" title="背景音乐">🔊</button>
@@ -241,7 +244,7 @@ if (isJoinMode) {
   $('m_submit').onclick = async () => {
     const name = $('m_name').value.trim();
     if (!name) {
-      $('msg').style.color = '#ff9a9a';
+      $('msg').style.color = '#ff5e3d';
       $('msg').textContent = '请输入姓名';
       return;
     }
@@ -251,11 +254,11 @@ if (isJoinMode) {
     
     try {
       await fetch(`https://ntfy.sh/${ntfyTopic}`, { method: 'POST', body: name });
-      $('msg').style.color = '#9fe0a0';
+      $('msg').style.color = '#00f2fe';
       $('msg').textContent = '登记成功！请关注大屏';
       $('m_name').value = '';
     } catch (e) {
-      $('msg').style.color = '#ff9a9a';
+      $('msg').style.color = '#ff5e3d';
       $('msg').textContent = '网络异常，请重试';
     } finally {
       setTimeout(() => {
@@ -271,7 +274,7 @@ if (isJoinMode) {
 
   // 音乐控制
   const bgm = $('bgm');
-  bgm.volume = 0.2; // 音量 20%
+  bgm.volume = 0.2;
   let isBgmPlaying = false;
   $('bgmBtn').onclick = () => {
     if (isBgmPlaying) { bgm.pause(); $('bgmBtn').textContent = '🔇'; }
@@ -279,10 +282,8 @@ if (isJoinMode) {
     isBgmPlaying = !isBgmPlaying;
   };
 
-  // 生成超大尺寸二维码
   const joinUrl = location.origin + location.pathname + '?join=' + roomId;
   new QRCode($("bigQrcode"), { text: joinUrl, width: 360, height: 360 });
-
   $('showQrBtn').onclick = () => $('qrModal').style.display = 'flex';
   $('qrModal').onclick = () => $('qrModal').style.display = 'none';
 
@@ -291,10 +292,10 @@ if (isJoinMode) {
   const ctx = canvas.getContext('2d');
   let W, H, cx, cy, R, dpr;
   let rotY = 0, speed = 0.2, targetSpeed = 0.2;
-  let slots = [], flyers = [], sparks = []; // sparks 为爆炸粒子
+  let slots = [], flyers = [], sparks = [], bgStars = [];
   let state = 'idle'; 
   let currentPrizeId = null;
-  let centerWinners = []; // 支持批量展示
+  let centerWinners = []; 
   let showTimer = 0;
   
   const MAX = 400;
@@ -306,6 +307,15 @@ if (isJoinMode) {
       const r = Math.sqrt(Math.max(0, 1 - y * y));
       const theta = Math.PI * (3 - Math.sqrt(5)) * i;
       slots.push({ bx: Math.cos(theta) * r, by: y, bz: Math.sin(theta) * r, name: null });
+    }
+    // 初始化背景星空
+    bgStars = [];
+    for(let i=0; i<100; i++) {
+      bgStars.push({
+        x: Math.random() * 2000, y: Math.random() * 2000,
+        s: Math.random() * 1.5 + 0.5, a: Math.random() * 0.5 + 0.1,
+        speed: Math.random() * 0.5 + 0.1
+      });
     }
   }
 
@@ -320,18 +330,14 @@ if (isJoinMode) {
   }
   window.addEventListener('resize', resize);
 
-  // 生成爆炸火花
-  function createSparks(x, y, color = '#ffd700') {
-    for (let i = 0; i < 80; i++) {
+  // 爆炸粒子
+  function createSparks(x, y, color = '#00f2fe') {
+    for (let i = 0; i < 100; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = Math.random() * 8 + 2;
+      const spd = Math.random() * 10 + 3;
       sparks.push({
-        x, y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 1,
-        decay: Math.random() * 0.02 + 0.015,
-        color: color
+        x, y, vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd,
+        life: 1, decay: Math.random() * 0.02 + 0.015, color: color
       });
     }
   }
@@ -340,54 +346,66 @@ if (isJoinMode) {
     speed += (targetSpeed - speed) * Math.min(1, dt * 2.2);
     rotY += speed * dt;
 
+    // 更新星空
+    bgStars.forEach(s => {
+      s.y -= s.speed;
+      if (s.y < 0) { s.y = H; s.x = Math.random() * W; }
+    });
+
     // 更新粒子
     for (let i = sparks.length - 1; i >= 0; i--) {
       const p = sparks[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vx *= 0.96;
-      p.vy *= 0.96;
+      p.x += p.vx; p.y += p.vy;
+      p.vx *= 0.95; p.vy *= 0.95;
       p.life -= p.decay;
       if (p.life <= 0) sparks.splice(i, 1);
     }
 
-    // 处理飞行动画
+    // 彗星飞行
     for (let i = flyers.length - 1; i >= 0; i--) {
       const f = flyers[i];
       if (now < f.startAt) continue;
       const t = Math.min(1, (now - f.startAt) / f.duration);
-      // 缓动函数（带一点回弹效果）
+      
+      // 缓动：先快后慢，带一点回弹
       const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       
-      f.pos = {
-        x: (1-e)*(1-e)*f.start.x + 2*(1-e)*e*f.cp.x + e*e*f.end.x,
-        y: (1-e)*(1-e)*f.start.y + 2*(1-e)*e*f.cp.y + e*e*f.end.y
-      };
+      const nx = (1-e)*(1-e)*f.start.x + 2*(1-e)*e*f.cp.x + e*e*f.end.x;
+      const ny = (1-e)*(1-e)*f.start.y + 2*(1-e)*e*f.cp.y + e*e*f.end.y;
+      
+      // 记录轨迹（彗星尾巴）
+      if (!f.trail) f.trail = [];
+      f.trail.push({x: nx, y: ny});
+      if (f.trail.length > 25) f.trail.shift();
+      
+      f.pos = {x: nx, y: ny};
 
       if (t >= 1 && !f.arrived) {
         f.arrived = true;
-        centerWinners.push({ name: f.name, born: now, scale: 0 });
-        createSparks(cx, cy); // 到达中心时爆炸
+        // 修复初始化问题：给一个初始的极小缩放，让第一帧不至于消失
+        centerWinners.push({ name: f.name, born: now, scale: 0.1 });
+        createSparks(cx, cy, '#00f2fe'); // 到达爆炸
+        createSparks(cx, cy, '#ffd700');
       }
     }
     flyers = flyers.filter(f => !f.arrived);
 
-    // 处理中心名字的缩放缓冲
+    // 中心名字弹射放大
     centerWinners.forEach(w => {
       const age = (now - w.born) / 1000;
-      if (age < 0.6) w.scale = age * 1.5; // 缓冲放大
-      else w.scale = 0.9 + Math.sin((age - 0.6) * 5) * 0.05;
+      if (age < 0.4) {
+        w.scale = 0.1 + age * 2.5; // 0.4秒内快速放大
+      } else {
+        w.scale = 1.1 + Math.sin((age - 0.4) * 6) * 0.03; // 稍微大一点点并呼吸
+      }
     });
 
-    // 批量揭晓循环
+    // 批量揭晓轮换
     if (state === 'flying' && flyers.length === 0 && centerWinners.length > 0) {
-      if (now - showTimer > 2500) { // 每个名字停留 2.5 秒
+      if (now - showTimer > 2500) {
         centerWinners.shift(); 
         showTimer = now;
-        if (centerWinners.length > 0) {
-           // 如果有下一个，可以伴随小爆炸
-           createSparks(cx, cy, '#8fd3ff');
-        }
+        if (centerWinners.length > 0) createSparks(cx, cy, '#00f2fe');
       }
     }
 
@@ -403,20 +421,35 @@ if (isJoinMode) {
     if (!W) return;
     ctx.clearRect(0, 0, W, H);
     
-    // 背景光晕
+    // 1. 动态背景渲染
+    ctx.fillStyle = '#030610';
+    ctx.fillRect(0, 0, W, H);
+    
+    // 背景星点
+    bgStars.forEach(s => {
+      ctx.fillStyle = `rgba(0, 242, 254, ${s.a})`;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.s, 0, Math.PI*2);
+      ctx.fill();
+    });
+
+    // 背景大光晕
     const bg = ctx.createRadialGradient(cx, cy, R*0.1, cx, cy, R*1.8);
     if (state === 'spinning') {
       const pulse = Math.abs(Math.sin(now / 150));
-      bg.addColorStop(0, `rgba(50,120,220,${0.2 + pulse*0.1})`);
+      bg.addColorStop(0, `rgba(0, 242, 254, ${0.15 + pulse*0.1})`);
+      bg.addColorStop(1, 'rgba(0, 0, 0, 0)');
     } else if (state === 'flying') {
-      bg.addColorStop(0, 'rgba(255,215,0,0.15)'); // 中奖时背景泛金
+      bg.addColorStop(0, 'rgba(255, 215, 0, 0.15)'); // 中奖时泛金
+      bg.addColorStop(1, 'rgba(0, 0, 0, 0)');
     } else {
-      bg.addColorStop(0, 'rgba(30,70,130,0.15)');
+      bg.addColorStop(0, 'rgba(0, 242, 254, 0.05)');
+      bg.addColorStop(1, 'rgba(0, 0, 0, 0)');
     }
-    bg.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
+    // 2. 绘制球体
     const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
     const cosX = Math.cos(-0.18), sinX = Math.sin(-0.18);
     const arr = [];
@@ -433,11 +466,8 @@ if (isJoinMode) {
       
       const persp = 2.4 / (2.4 + z);
       arr.push({
-        x: cx + x * R * persp,
-        y: cy + y * R * persp,
-        z: z,
-        persp: persp,
-        name: displayNames[i % displayNames.length] || null
+        x: cx + x * R * persp, y: cy + y * R * persp,
+        z: z, persp: persp, name: displayNames[i % displayNames.length] || null
       });
     }
     
@@ -445,81 +475,111 @@ if (isJoinMode) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    // 绘制外圈光环
+    // 绘制光环
     ctx.beginPath();
-    ctx.arc(cx, cy, R * 1.1, 0, Math.PI * 2);
-    ctx.strokeStyle = state === 'spinning' ? 'rgba(90,170,255,0.4)' : 'rgba(90,170,255,0.1)';
+    ctx.arc(cx, cy, R * 1.15, 0, Math.PI * 2);
+    ctx.strokeStyle = state === 'spinning' ? 'rgba(0, 242, 254, 0.5)' : 'rgba(0, 242, 254, 0.15)';
     ctx.lineWidth = 2;
     ctx.stroke();
 
+    // 绘制球体文字（增加高光）
     for (const a of arr) {
       if (a.name) {
         const depth = (a.z + 1) / 2;
-        const alpha = 0.1 + depth * 0.8;
-        const size = 9 + a.persp * 9;
-        ctx.font = `600 ${size.toFixed(1)}px "Microsoft YaHei"`;
-        ctx.fillStyle = `rgba(190,225,255,${alpha})`;
+        const alpha = 0.15 + depth * 0.85; // 调高基础亮度
+        const size = 10 + a.persp * 9;
+        ctx.font = `bold ${size.toFixed(1)}px "Microsoft YaHei"`;
+        
+        // 发光特效
+        ctx.shadowColor = 'rgba(0, 242, 254, 0.8)';
+        ctx.shadowBlur = a.persp * 10;
+        ctx.fillStyle = `rgba(220, 240, 255, ${alpha})`;
         ctx.fillText(a.name, a.x, a.y);
+        ctx.shadowBlur = 0; // 重置
       }
     }
 
-    // 绘制飞行中的光球和拖尾
+    // 3. 绘制彗星轨迹
     for (const f of flyers) {
-      if (f.pos) {
-        const g = ctx.createRadialGradient(f.pos.x, f.pos.y, 0, f.pos.x, f.pos.y, 20);
-        g.addColorStop(0, '#fff');
-        g.addColorStop(0.5, '#8fd3ff');
-        g.addColorStop(1, 'rgba(80,160,255,0)');
-        ctx.fillStyle = g;
+      if (f.pos && f.trail) {
+        // 画尾巴
+        for (let i = 1; i < f.trail.length; i++) {
+          const p1 = f.trail[i-1];
+          const p2 = f.trail[i];
+          const trailAlpha = i / f.trail.length;
+          
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          
+          // 尾巴颜色：青蓝色渐变到透明
+          ctx.strokeStyle = `rgba(0, 242, 254, ${trailAlpha})`;
+          ctx.lineWidth = trailAlpha * 8;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+        }
+        
+        // 彗星头部
+        const headGrad = ctx.createRadialGradient(f.pos.x, f.pos.y, 0, f.pos.x, f.pos.y, 25);
+        headGrad.addColorStop(0, '#fff');
+        headGrad.addColorStop(0.3, '#00f2fe');
+        headGrad.addColorStop(1, 'rgba(0, 242, 254, 0)');
+        ctx.fillStyle = headGrad;
         ctx.beginPath();
-        ctx.arc(f.pos.x, f.pos.y, 20, 0, Math.PI*2);
+        ctx.arc(f.pos.x, f.pos.y, 25, 0, Math.PI*2);
         ctx.fill();
       }
     }
 
-    // 绘制爆炸粒子
+    // 4. 绘制爆炸粒子
     for (const p of sparks) {
       ctx.globalAlpha = p.life;
       ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 10;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 3 * p.life, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 4 * p.life, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
 
-    // 绘制中心中奖名字（金色，带光晕）
+    // 5. 绘制中心中奖名字（高光、金色、极强质感）
     if (centerWinners.length > 0) {
       const w = centerWinners[0];
       const age = (now - w.born) / 1000;
-      const alpha = Math.min(1, age * 5); // 快速淡入
+      const alpha = Math.min(1, age * 5);
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.translate(cx, cy);
       ctx.scale(w.scale, w.scale);
       
-      ctx.font = '900 90px "Microsoft YaHei"';
+      ctx.font = '900 110px "Microsoft YaHei"';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       
-      // 描边加粗
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = '#fff';
+      // 1. 外发光（青色）
+      ctx.shadowColor = '#00f2fe';
+      ctx.shadowBlur = 80;
+      ctx.fillStyle = '#fff';
+      ctx.fillText(w.name, 0, 0);
+      
+      // 2. 金色描边
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#ffd700';
       ctx.strokeText(w.name, 0, 0);
       
-      // 金色渐变填充
-      const grad = ctx.createLinearGradient(0, -50, 0, 50);
-      grad.addColorStop(0, '#fff8b0');
-      grad.addColorStop(0.5, '#ffd700');
+      // 3. 金色渐变填充
+      const grad = ctx.createLinearGradient(0, -60, 0, 60);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.3, '#fff8b0');
+      grad.addColorStop(0.7, '#ffd700');
       grad.addColorStop(1, '#ff8c00');
       ctx.fillStyle = grad;
       
-      // 强发光
-      ctx.shadowColor = '#ffd700';
-      ctx.shadowBlur = 60;
-      ctx.fillText(w.name, 0, 0);
-      
-      // 再次发光叠加
+      // 4. 内部高光重叠
       ctx.shadowBlur = 20;
+      ctx.shadowColor = '#ffd700';
       ctx.fillText(w.name, 0, 0);
       
       ctx.restore();
@@ -569,15 +629,13 @@ if (isJoinMode) {
   // --- 抽奖控制 ---
   $('startBtn').onclick = () => {
     if (state !== 'idle') return;
-    
-    // 首次点击自动播放 BGM
     if (!isBgmPlaying) { bgm.play().catch(e=>{}); isBgmPlaying = true; $('bgmBtn').textContent = '🔊'; }
     
     state = 'spinning';
     targetSpeed = 3.5;
     $('startBtn').disabled = true;
     $('stopBtn').disabled = false;
-    centerWinners = []; // 清空上次结果
+    centerWinners = [];
   };
 
   $('stopBtn').onclick = () => {
@@ -594,7 +652,6 @@ if (isJoinMode) {
       return;
     }
 
-    // 获取要抽的人数（支持批量）
     let batch = parseInt($('drawCount').value) || 1;
     batch = Math.min(batch, prize.quota - prize.drawn, pool.length);
     
@@ -603,7 +660,6 @@ if (isJoinMode) {
       return;
     }
 
-    // 抽取多人
     const picked = [];
     const poolCopy = [...pool];
     for(let i=0; i<batch; i++){
@@ -611,7 +667,6 @@ if (isJoinMode) {
       picked.push(poolCopy.splice(idx, 1)[0]);
     }
     
-    // 更新数据
     picked.forEach((p, i) => {
       p.won = true;
       prize.drawn++;
@@ -620,20 +675,21 @@ if (isJoinMode) {
     saveData();
     renderUI();
 
-    // 触发飞入动画
     const now = performance.now();
     showTimer = now;
     
     picked.forEach((p, index) => {
+      // 减慢飞行时间，增加拖尾
       flyers.push({
         name: p.name,
-        start: { x: cx + (Math.random()-0.5)*W*0.8, y: cy + (Math.random()-0.5)*H*0.8 },
+        start: { x: cx + (Math.random()-0.5)*W*0.9, y: cy + (Math.random()-0.5)*H*0.9 },
         end: { x: cx, y: cy },
-        cp: { x: cx + (Math.random()-0.5)*W*0.4, y: cy + (Math.random()-0.5)*H*0.4 },
-        startAt: now + 1000 + index * 150, // 错开出发时间
-        duration: 2000, // 飞行时间加长，增强缓冲感
+        cp: { x: cx + (Math.random()-0.5)*W*0.5, y: cy + (Math.random()-0.5)*H*0.5 },
+        startAt: now + 800 + index * 200, 
+        duration: 2800, // 2.8秒飞行，轨迹更明显
         arrived: false,
-        pos: null
+        pos: null,
+        trail: []
       });
     });
     
