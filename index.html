@@ -103,6 +103,8 @@ canvas{display:block;width:100%;height:100%}
 #rosterBox{width:900px;max-width:95vw;max-height:90vh;overflow:auto;background:#0f1a2e;border:1px solid rgba(0,242,254,.32);border-radius:16px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.85)}
 #rosterBox h3{margin:0 0 4px 0;color:#00f2fe;font-size:18px}
 #rosterStat{color:#9fc4e6;font-size:13px;margin-bottom:14px}
+.danger-armed{background:#ff3b3b !important;color:#fff !important;animation:rzblink 1s infinite}
+@keyframes rzblink{50%{opacity:.55}}
 .rz-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media (max-width:820px){.rz-grid{grid-template-columns:1fr}}
 .rz-sec{border:1px solid rgba(0,242,254,.18);border-radius:12px;padding:14px}
@@ -221,6 +223,7 @@ canvas{display:block;width:100%;height:100%}
           <button class="rz-btn primary" id="rz_import">导入名单</button>
           <button class="rz-btn" id="rz_copy">复制当前名单</button>
           <button class="rz-btn danger" id="rz_clear">清空名单</button>
+          <button class="rz-btn" id="rz_restore">恢复上次名单</button>
         </div>
         <div class="rz-tip">扫码登记与现场录入可混用，人数无上限；导入后自动存入本机并参与抽奖。</div>
       </div>
@@ -257,6 +260,38 @@ function showTip(msg) {
   window.__tipTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+// ======== 多色高亮调色板（人名随机配色，混合多种色彩） ========
+const NAME_PALETTE = ['#7df9ff','#ffd700','#ff8ad4','#8affc1','#c4a1ff','#ff9e6b','#7ecbff','#fff36b','#ff6b9d','#6bffb0','#ffa8ff','#9effff','#ffd0a8','#d8b4ff'];
+function pickNameColor(){ return NAME_PALETTE[Math.floor(Math.random() * NAME_PALETTE.length)]; }
+function hexShade(hex, f){
+  const n = parseInt(String(hex).slice(1), 16);
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  r = Math.max(0, Math.min(255, Math.round(r * f)));
+  g = Math.max(0, Math.min(255, Math.round(g * f)));
+  b = Math.max(0, Math.min(255, Math.round(b * f)));
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+
+// ======== 名单应急恢复：每次破坏性操作前自动快照，最多留 20 份，可一键撤销 ========
+let undoStack = [];
+function pushUndo(label){
+  try {
+    undoStack.push({
+      label: label || '',
+      participants: JSON.parse(JSON.stringify(participants || [])),
+      winners: JSON.parse(JSON.stringify(winners || [])),
+      drawn: (typeof prizes !== 'undefined' && prizes) ? prizes.map(p => p.drawn) : [],
+      ts: Date.now()
+    });
+    if (undoStack.length > 20) undoStack.shift();
+    localStorage.setItem('lottery_undo', JSON.stringify(undoStack));
+  } catch(e){}
+}
+function loadUndo(){
+  try { undoStack = JSON.parse(localStorage.getItem('lottery_undo') || '[]'); if (!Array.isArray(undoStack)) undoStack = []; }
+  catch(e){ undoStack = []; }
+}
+
 function hashStr(str) {
   let h = 5381;
   for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
@@ -474,6 +509,7 @@ function loadData() {
   } else {
     participants = [];
   }
+  loadUndo();
 }
 function saveData() {
   try {
@@ -515,6 +551,7 @@ function addParticipant(name, uid, source) {
 function removeParticipant(uid) {
   const i = participants.findIndex(p => p.uid === uid);
   if (i < 0) return false;
+  pushUndo('删除人员');
   const p = participants[i];
   if (p.won) {
     const idx = winners.findIndex(w => w.uid === uid);
@@ -747,7 +784,7 @@ if (isJoinMode) {
       const theta = Math.PI * (3 - Math.sqrt(5)) * i;
       slots.push({
         bx: Math.cos(theta) * r, by: y, bz: Math.sin(theta) * r,
-        name: null, owner: null,
+        name: null, owner: null, col: pickNameColor(),
         seed: Math.random(),          // 每个光点独立的闪烁相位
         sx: 0, sy: 0, sz: 0, persp: 1 // 每帧缓存球面投影坐标，供“光点飞出”取起点
       });
@@ -767,17 +804,33 @@ if (isJoinMode) {
   // 每来一位登记人员，就把球面上“一个”光点替换成他/她的名字；
   // 未登记到的槽位继续保留为光点，因此光点总数恒定、球体形状不变。
   function assignNamesToSlots(pool) {
-    for (let i = 0; i < slots.length; i++) { slots[i].name = null; slots[i].owner = null; slots[i].used = false; }
-    const n = Math.min(pool.length, slots.length);
-    if (n <= 0) return;
-    for (let k = 0; k < n; k++) {
-      let idx = Math.floor(k * slots.length / n) % slots.length;  // 均匀散布在球面
-      let guard = 0;
-      while (slots[idx].name !== null && guard < slots.length) {  // 防撞位
-        idx = (idx + 1) % slots.length; guard++;
-      }
-      slots[idx].name = pool[k].disp || pool[k].name;
-      slots[idx].owner = pool[k];
+    const poolSet = new Set(pool);
+    // 1) 释放：槽位主人已不在池中（中奖 / 被删除）→ 退回为光点；清除本轮临时占用标记
+    for (let i = 0; i < slots.length; i++) {
+      const s = slots[i];
+      if (s.owner && !poolSet.has(s.owner)) { s.name = null; s.owner = null; }
+      s.used = false;
+    }
+    // 2) 区分“已稳定占位的人”和“本次新增的人”：已占位者保持原位置，绝不每帧跳动
+    const bound = new Set();
+    for (let i = 0; i < slots.length; i++) if (slots[i].owner) bound.add(slots[i].owner);
+    const toAssign = pool.filter(p => !bound.has(p));
+    if (!toAssign.length) {
+      for (let i = 0; i < slots.length; i++) if (slots[i].owner) slots[i].name = slots[i].owner.disp || slots[i].owner.name;
+      return;
+    }
+    // 3) 把新增人员打乱后，投放到“随机选取的空闲光点”上（而非按登记先后从下到上顺铺）
+    const free = [];
+    for (let i = 0; i < slots.length; i++) if (!slots[i].owner) free.push(i);
+    shuffleStrong(free);
+    shuffleStrong(toAssign);
+    let fi = 0;
+    for (let k = 0; k < toAssign.length; k++) {
+      if (fi >= free.length) break;
+      const s = slots[free[fi++]];
+      s.name = toAssign[k].disp || toAssign[k].name;
+      s.owner = toAssign[k];
+      s.col = pickNameColor();   // 每次上墙随机分配一种高亮主色
     }
   }
 
@@ -967,7 +1020,7 @@ if (isJoinMode) {
       s.sz = z;
       s.persp = persp;
 
-      arr.push({ x: s.sx, y: s.sy, z: z, persp: persp, name: s.name, seed: s.seed });
+      arr.push({ x: s.sx, y: s.sy, z: z, persp: persp, name: s.name, seed: s.seed, col: s.col });
     }
     
     arr.sort((a, b) => a.z - b.z);
@@ -977,23 +1030,38 @@ if (isJoinMode) {
     for (const a of arr) {
       if (a.name) {
         const depth = (a.z + 1) / 2;
-        const alpha = 0.15 + depth * 0.85;
+        const alpha = 0.45 + depth * 0.55;
         const size = 10 + a.persp * 9;
+        const col = a.col || '#dff0ff';
         ctx.font = `bold ${size.toFixed(1)}px "Microsoft YaHei"`;
-        ctx.shadowColor = 'rgba(0, 242, 254, 0.8)';
-        ctx.shadowBlur = a.persp * 10;
-        ctx.fillStyle = `rgba(220, 240, 255, ${alpha})`;
+        ctx.globalAlpha = alpha;
+        ctx.shadowColor = col;
+        ctx.shadowBlur = 6 + depth * 16;
+        const ng = ctx.createLinearGradient(a.x, a.y - size, a.x, a.y + size);
+        ng.addColorStop(0, '#ffffff');
+        ng.addColorStop(0.45, col);
+        ng.addColorStop(1, hexShade(col, 0.5));
+        ctx.fillStyle = ng;
         ctx.fillText(a.name, a.x, a.y);
         ctx.shadowBlur = 0;
+        ctx.lineWidth = 0.6;
+        ctx.strokeStyle = 'rgba(255,255,255,' + (0.3 + depth * 0.4) + ')';
+        ctx.strokeText(a.name, a.x, a.y);
+        ctx.globalAlpha = 1;
       } else {
         // 未分配的槽位 = 球面上的光点（默认满屏光点，构成完整球体）
         const depth = (a.z + 1) / 2;
         const tw = 0.7 + 0.3 * Math.sin(now * 0.0022 + a.seed * 6.283);
         const rad = (1.1 + depth * 1.9) * a.persp;
+        let dotR = 150, dotG = 240, dotB = 255;   // 多数为青蓝，少数暖金/粉/绿，混合色彩
+        if (a.seed > 0.9)       { dotR = 255; dotG = 215; dotB = 120; }
+        else if (a.seed > 0.8)  { dotR = 255; dotG = 150; dotB = 210; }
+        else if (a.seed > 0.72) { dotR = 170; dotG = 255; dotB = 190; }
+        const dotA = (0.16 + depth * 0.66) * tw;
         ctx.beginPath();
         ctx.arc(a.x, a.y, rad, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(150, 240, 255, ${(0.16 + depth * 0.66) * tw})`;
-        ctx.shadowColor = 'rgba(0, 242, 254, 0.9)';
+        ctx.fillStyle = `rgba(${dotR}, ${dotG}, ${dotB}, ${dotA})`;
+        ctx.shadowColor = `rgba(${dotR}, ${dotG}, ${dotB}, 0.9)`;
         ctx.shadowBlur = depth * 9;
         ctx.fill();
         ctx.shadowBlur = 0;
@@ -1236,7 +1304,8 @@ if (isJoinMode) {
     const scanned = participants.filter(p => p.src !== 'local').length;
     const pending = participants.filter(p => !p.won).length;
     stat.innerHTML = '已登记 <b style="color:#00f2fe">' + total + '</b> 人（扫码 ' + scanned +
-      ' · 现场录入 ' + (total - scanned) + '）　待抽奖 ' + pending + '　已中奖 ' + (total - pending);
+      ' · 现场录入 ' + (total - scanned) + '）　待抽奖 ' + pending + '　已中奖 ' + (total - pending) +
+      '　<span style="color:#7a9ec4">可恢复快照 ' + undoStack.length + ' 份</span>';
 
     const live = COMM.chOk.filter(Boolean).length;
     const tm = COMM.lastSync ? new Date(COMM.lastSync).toLocaleTimeString('zh-CN', { hour12: false }) : '尚未';
@@ -1261,9 +1330,10 @@ if (isJoinMode) {
     ).join('') + (arr.length > shown.length ? '<div class="rz-empty">仅显示前 1000 条，可输入姓名搜索定位</div>' : '');
     list.querySelectorAll('.del').forEach(btn => {
       btn.onclick = () => {
+        if (state !== 'idle') { showTip('抽奖进行中，请先结束本轮再删除'); return; }
         const uid = btn.getAttribute('data-uid');
         const p = participants.find(x => x.uid === uid);
-        if (p && confirm('删除「' + (p.disp || p.name) + '」？' + (p.won ? '其中奖记录也会一并移除。' : ''))) removeParticipant(uid);
+        if (p && confirm('删除「' + (p.disp || p.name) + '」？删除后可用「恢复上次名单」撤销。' + (p.won ? '其中奖记录也会一并移除。' : ''))) removeParticipant(uid);
       };
     });
   }
@@ -1321,8 +1391,40 @@ if (isJoinMode) {
     showTip(done ? ('已复制 ' + participants.length + ' 个姓名') : '复制失败，可在大屏名单区逐个核对');
   };
 
+  // —— 误点防护 + 应急恢复 ——
+  let __clearArmed = false, __clearTimer = null;
+  function restoreUndo() {
+    if (state !== 'idle') { showTip('抽奖进行中，暂不可恢复名单（请先结束本轮）'); return; }
+    if (!undoStack.length) { showTip('没有可恢复的名单快照'); return; }
+    const snap = undoStack.pop();
+    try { localStorage.setItem('lottery_undo', JSON.stringify(undoStack)); } catch(e){}
+    participants = snap.participants || [];
+    winners = snap.winners || [];
+    if (snap.drawn && snap.drawn.length) prizes.forEach((p, i) => { if (typeof snap.drawn[i] === 'number') p.drawn = snap.drawn[i]; });
+    relabel();
+    if (typeof ensureSlotCapacity === 'function') ensureSlotCapacity();
+    saveData();
+    renderUI();
+    renderRoster();
+    showTip('已恢复上一版名单：当前 ' + participants.length + ' 人');
+  }
+  $('rz_restore').onclick = () => restoreUndo();
+
   $('rz_clear').onclick = () => {
-    if (!confirm('确定清空全部 ' + participants.length + ' 人名单？中奖记录与各奖项已抽数量会一并清零。')) return;
+    if (state !== 'idle') { showTip('抽奖进行中，为避免误删已锁定清空'); return; }
+    if (!participants.length) { showTip('名单已是空的'); return; }
+    if (!__clearArmed) {
+      __clearArmed = true;
+      $('rz_clear').textContent = '再次点击确认清空（' + participants.length + ' 人）';
+      $('rz_clear').classList.add('danger-armed');
+      showTip('防误点：再点一次才真正清空；清空后仍可点「恢复上次名单」撤销');
+      if (__clearTimer) clearTimeout(__clearTimer);
+      __clearTimer = setTimeout(() => { __clearArmed = false; $('rz_clear').textContent = '清空名单'; $('rz_clear').classList.remove('danger-armed'); }, 4000);
+      return;
+    }
+    clearTimeout(__clearTimer); __clearArmed = false;
+    $('rz_clear').textContent = '清空名单'; $('rz_clear').classList.remove('danger-armed');
+    pushUndo('清空全部名单');
     participants = [];
     winners = [];
     prizes.forEach(p => { p.drawn = 0; });
@@ -1330,7 +1432,7 @@ if (isJoinMode) {
     saveData();
     renderUI();
     renderRoster();
-    showTip('名单已清空');
+    showTip('名单已清空，如需找回请点「恢复上次名单」');
   };
 
   $('rz_saveComm').onclick = () => {
@@ -1405,6 +1507,7 @@ if (isJoinMode) {
   $('savePrizesBtn').onclick = () => {
     collectEditor();
     
+    pushUndo('修改奖项设置');
     // 修复：保存奖项时，重置所有人的中奖状态并清空名单
     prizes.forEach(p => p.drawn = 0);
     participants.forEach(p => p.won = false); 
@@ -1417,7 +1520,9 @@ if (isJoinMode) {
   };
 
   $('resetBtn').onclick = () => {
-    if (!confirm('确定要清空所有已抽奖项数量，并清空中奖名单吗？')) return;
+    if (state !== 'idle') return alert('请等待当前抽奖动画结束');
+    if (!confirm('确定要清空所有已抽奖项数量，并清空中奖名单吗？（人员名单不会被删除，且可撤销）')) return;
+    pushUndo('重置中奖记录');
     prizes.forEach(p => p.drawn = 0);
     participants.forEach(p => p.won = false); // 修复：同时重置人员的未中奖状态
     winners = [];
