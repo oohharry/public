@@ -23,6 +23,9 @@ header{height:70px;display:flex;align-items:center;justify-content:space-between
 #settingBtn:hover{background:rgba(0,242,254,.2)}
 #rosterBtn{height:36px;padding:0 14px;white-space:nowrap;border:1px solid rgba(0,242,254,.5);border-radius:8px;background:rgba(0,242,254,.1);color:#00f2fe;font-size:14px;cursor:pointer;transition:.2s}
 #rosterBtn:hover{background:rgba(0,242,254,.2)}
+#fullBtn{height:36px;padding:0 14px;white-space:nowrap;border:1px solid rgba(0,242,254,.5);border-radius:8px;background:rgba(0,242,254,.1);color:#00f2fe;font-size:14px;cursor:pointer;transition:.2s;min-width:78px}
+#fullBtn:hover{background:rgba(0,242,254,.2)}
+#fullBtn:active{transform:scale(0.96)}
 #tipToast{position:fixed;top:84px;left:50%;transform:translateX(-50%);z-index:300;
 background:rgba(8,20,40,.92);border:1px solid rgba(0,242,254,.5);color:#eaf4ff;
 padding:10px 22px;border-radius:24px;font-size:15px;opacity:0;pointer-events:none;
@@ -167,6 +170,7 @@ canvas{display:block;width:100%;height:100%}
       <button id="showQrBtn">📱 扫码参与</button>
       <button id="rosterBtn">名单管理</button>
       <button id="settingBtn">⚙️ 设置奖项</button>
+      <button id="fullBtn" type="button" title="全屏显示 / 退出全屏（快捷键 F）">全屏</button>
     </div>
   </header>
   <main>
@@ -1183,6 +1187,47 @@ if (isJoinMode) {
   }
   window.addEventListener('resize', function () { resize(true); });
 
+  // ===== 全屏显示（按钮 + 快捷键 F，自动跟随分辨率重绘画布） =====
+  (function initFullscreen(){
+    const btn = $('fullBtn');
+    if (!btn) return;
+    const doc = document;
+    function fsEl(){ return doc.fullscreenElement || doc.webkitFullscreenElement || null; }
+    function refresh(){
+      btn.textContent = fsEl() ? '退出全屏' : '全屏';
+      btn.title = fsEl() ? '退出全屏显示（按 Esc 或 F）' : '全屏显示 / 退出全屏（快捷键 F）';
+    }
+    function goFs(){
+      const root = doc.documentElement;
+      const req = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
+      if (!req) { alert('当前浏览器不支持全屏，请按 F11 进入全屏'); return; }
+      try {
+        const r = req.call(root);
+        if (r && typeof r.catch === 'function') r.catch(function(){});
+      } catch (e) {}
+    }
+    function exitFs(){
+      const ex = doc.exitFullscreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+      if (ex) { try { const r = ex.call(doc); if (r && typeof r.catch === 'function') r.catch(function(){}); } catch (e) {} }
+    }
+    function toggle(){ fsEl() ? exitFs() : goFs(); }
+    btn.onclick = function(e){ e.preventDefault(); toggle(); };
+    ['fullscreenchange','webkitfullscreenchange','MSFullscreenChange'].forEach(function(ev){
+      doc.addEventListener(ev, function(){
+        refresh();
+        setTimeout(function(){ resize(true); }, 120);   // 全屏尺寸稳定后重建画布
+        setTimeout(function(){ resize(true); }, 600);
+      });
+    });
+    doc.addEventListener('keydown', function(e){
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggle(); }
+    });
+    refresh();
+  })();
+
   // ===== 球体氛围辉光（取代线条轨道） =====
   function drawSphereGlow(now, front) {
     return; // 已移除球面外圈的蓝光氛围环与两极光晕
@@ -1298,6 +1343,7 @@ if (isJoinMode) {
     }
   }
   function addConfetti(x, y, n) {
+    return; // 已移除中奖人名上方那一片矩形碎片彩带（矩形烟花）；圆形爆闪粒子与金色主爆点保留
     if (confetti.length > 900) return; // 彩带上限
     for (let i = 0; i < n; i++) {
       confetti.push({
