@@ -21,7 +21,8 @@ header{height:70px;display:flex;align-items:center;justify-content:space-between
 #showQrBtn:active{transform:scale(0.95)}
 #settingBtn{height:36px;padding:0 14px;white-space:nowrap;border:1px solid rgba(0,242,254,.5);border-radius:8px;background:rgba(0,242,254,.1);color:#00f2fe;font-size:14px;cursor:pointer;transition:.2s}
 #settingBtn:hover{background:rgba(0,242,254,.2)}
-#rosterBtn{white-space:nowrap}
+#rosterBtn{height:36px;padding:0 14px;white-space:nowrap;border:1px solid rgba(0,242,254,.5);border-radius:8px;background:rgba(0,242,254,.1);color:#00f2fe;font-size:14px;cursor:pointer;transition:.2s}
+#rosterBtn:hover{background:rgba(0,242,254,.2)}
 #tipToast{position:fixed;top:84px;left:50%;transform:translateX(-50%);z-index:300;
 background:rgba(8,20,40,.92);border:1px solid rgba(0,242,254,.5);color:#eaf4ff;
 padding:10px 22px;border-radius:24px;font-size:15px;opacity:0;pointer-events:none;
@@ -109,6 +110,7 @@ canvas{display:block;width:100%;height:100%}
 #resetBtn{background:rgba(255,94,61,.2);color:#ff5e3d;margin-top:10px;width:100%;height:38px;border:none;border-radius:6px;cursor:pointer;font-size:14px}
 /* ---- 名单管理（现场兜底录入 + 通道设置） ---- */
 .count .sync-stat{font-size:12px;color:#7fa8cc;font-weight:normal;margin-left:10px;white-space:nowrap;line-height:1.2}
+.conn-dot{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;margin-left:6px}
 .count{display:flex;align-items:center;overflow:hidden;text-overflow:ellipsis}
 .sync-stat.bad{color:#ff5e3d}
 .sync-stat.warn{color:#ffb020}
@@ -144,8 +146,7 @@ canvas{display:block;width:100%;height:100%}
 </head>
 <body>
 
-<!-- 背景音乐 -->
-<audio id="bgm" src="https://cdn.pixabay.com/audio/2022/03/15/audio_c8c8a73467.mp3" loop></audio>
+<!-- 背景音乐：Web Audio API 合成，无需外部文件 -->
 
 <!-- 大屏界面 -->
 <div id="screen">
@@ -397,20 +398,11 @@ function stampSync() { COMM.lastSync = Date.now(); renderSyncStat(); }
 function renderSyncStat() {
   const el = document.getElementById('syncStat');
   if (!el) return;
-  if (!COMM.started && !COMM.useMqtt) { el.textContent = ''; el.className = 'sync-stat'; return; }
+  if (!COMM.started && !COMM.useMqtt) { el.innerHTML = ''; return; }
   const n = COMM.chOk.filter(Boolean).length;
   const m = COMM.mqtt.filter(x => x && x.ok).length;
-  const tm = COMM.lastSync ? new Date(COMM.lastSync).toLocaleTimeString('zh-CN', { hour12: false }) : '';
-  if (n === 0 && m === 0) {
-    el.textContent = '通道接通中，可用名单管理录入';
-    el.className = 'sync-stat warn';
-  } else {
-    const parts = [];
-    if (n) parts.push('HTTP ' + n + '/' + COMM.subs);
-    if (m) parts.push('MQTT ' + m + '/' + MQTT_BROKERS.length);
-    el.textContent = '通道：' + parts.join(' · ') + (tm ? ' · ' + tm : '');
-    el.className = 'sync-stat good';
-  }
+  const connected = (n > 0 || m > 0);
+  el.innerHTML = '<span class="conn-dot" style="background:' + (connected ? '#41ffb0' : '#ff3b3b') + ';box-shadow:0 0 8px ' + (connected ? '#41ffb0' : '#ff3b3b') + '"></span>';
 }
 
 /* ---------- 通路 A：ntfy ---------- */
@@ -938,12 +930,123 @@ if (isJoinMode) {
   loadData();
   initComm();
 
-  const bgm = $('bgm');
-  bgm.volume = 0.2;
-  let isBgmPlaying = false;
-  $('bgmBtn').onclick = () => {
-    if (isBgmPlaying) { bgm.pause(); $('bgmBtn').textContent = '🔇'; }
-    else { bgm.play(); $('bgmBtn').textContent = '🔊'; }
+  // ======== Web Audio API 合成氛围音效（不依赖任何外部文件）========
+  let audioCtx = null, bgmGain = null, bgmNodes = [], isBgmPlaying = false;
+  let drumInterval = null, isDrumming = false;
+
+  function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    bgmGain = audioCtx.createGain();
+    bgmGain.gain.value = 0;
+    bgmGain.connect(audioCtx.destination);
+  }
+
+  function startAmbient() {
+    initAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    stopAmbient();
+    // 低频氛围 pad：多层正弦波 + 缓慢 LFO
+    var freqs = [55, 110, 165, 220, 330];
+    freqs.forEach(function(f, idx) {
+      var osc = audioCtx.createOscillator();
+      osc.type = idx < 2 ? 'sine' : 'triangle';
+      osc.frequency.value = f;
+      var g = audioCtx.createGain();
+      g.gain.value = 0.04 / (idx + 1);
+      var lfo = audioCtx.createOscillator();
+      lfo.frequency.value = 0.1 + idx * 0.07;
+      var lfoGain = audioCtx.createGain();
+      lfoGain.gain.value = 0.015 / (idx + 1);
+      lfo.connect(lfoGain);
+      lfoGain.connect(g.gain);
+      lfo.start();
+      osc.connect(g);
+      g.connect(bgmGain);
+      osc.start();
+      bgmNodes.push(osc, lfo);
+    });
+    // 高频 sparkle 层：极轻的噪声 + 带通滤波
+    var bufSize = audioCtx.sampleRate * 2;
+    var noiseBuf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+    var data = noiseBuf.getChannelData(0);
+    for (var i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+    var noise = audioCtx.createBufferSource();
+    noise.buffer = noiseBuf;
+    noise.loop = true;
+    var bp = audioCtx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 3000;
+    bp.Q.value = 5;
+    var ng = audioCtx.createGain();
+    ng.gain.value = 0.008;
+    noise.connect(bp);
+    bp.connect(ng);
+    ng.connect(bgmGain);
+    noise.start();
+    bgmNodes.push(noise);
+    bgmGain.gain.setTargetAtTime(0.25, audioCtx.currentTime, 1.5);
+  }
+
+  function stopAmbient() {
+    bgmNodes.forEach(function(n) { try { n.stop(); } catch(e){} });
+    bgmNodes = [];
+    if (bgmGain) bgmGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.5);
+  }
+
+  // 抽奖旋转时的紧张鼓点
+  function startDrums() {
+    if (isDrumming) return;
+    isDrumming = true;
+    initAudio();
+    drumInterval = setInterval(function() {
+      if (!audioCtx || audioCtx.state === 'suspended') return;
+      var osc = audioCtx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.12);
+      var g = audioCtx.createGain();
+      g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+      osc.connect(g); g.connect(audioCtx.destination);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+    }, 180);
+  }
+  function stopDrums() {
+    isDrumming = false;
+    if (drumInterval) { clearInterval(drumInterval); drumInterval = null; }
+  }
+
+  // 中奖音效：上行琶音 + 铃声
+  function playWinSound() {
+    initAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    var notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+    notes.forEach(function(freq, i) {
+      var osc = audioCtx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      var g = audioCtx.createGain();
+      var t0 = audioCtx.currentTime + i * 0.1;
+      g.gain.setValueAtTime(0.25, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.8);
+      osc.connect(g); g.connect(audioCtx.destination);
+      osc.start(t0); osc.stop(t0 + 0.8);
+      var osc2 = audioCtx.createOscillator();
+      osc2.type = 'triangle';
+      osc2.frequency.value = freq * 2;
+      var g2 = audioCtx.createGain();
+      g2.gain.setValueAtTime(0.08, t0);
+      g2.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
+      osc2.connect(g2); g2.connect(audioCtx.destination);
+      osc2.start(t0); osc2.stop(t0 + 1.2);
+    });
+  }
+
+  $('bgmBtn').onclick = function() {
+    initAudio();
+    if (isBgmPlaying) { stopAmbient(); $('bgmBtn').textContent = '🔇'; }
+    else { startAmbient(); $('bgmBtn').textContent = '🔊'; }
     isBgmPlaying = !isBgmPlaying;
   };
 
@@ -1229,10 +1332,11 @@ if (isJoinMode) {
 
       if (t >= 1 && !f.arrived) {
         f.arrived = true;
-        // 停留 5 秒
-        centerWinners.push({ name: f.name, born: now, expire: now + 5000 });
+        centerWinners.push({ name: f.name, born: now, expire: now + 3000 });
         createSparks(cx, cy, '#00f2fe'); 
         createSparks(cx, cy, '#ffd700');
+        stopDrums();
+        playWinSound();
       }
     }
     flyers = flyers.filter(f => !f.arrived);
@@ -1243,7 +1347,7 @@ if (isJoinMode) {
         centerWinners.shift(); 
         if (centerWinners.length > 0) {
           centerWinners[0].born = now;
-          centerWinners[0].expire = now + 5000;
+          centerWinners[0].expire = now + 3000;
         } else {
           // 所有动画完成，解除右侧按钮锁定
           state = 'idle';
@@ -1408,17 +1512,7 @@ if (isJoinMode) {
       ctx.fillStyle = spotlight;
       ctx.fillRect(0, 0, W, H);
 
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(age * 0.5); 
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 250, 80, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
-      ctx.lineWidth = 3;
-      ctx.shadowColor = '#ffd700';
-      ctx.shadowBlur = 20;
-      ctx.stroke();
-      ctx.restore();
+
 
       let scale = 1;
       if (age < 0.3) {
@@ -1537,10 +1631,11 @@ if (isJoinMode) {
       return;
     }
 
-    if (!isBgmPlaying) { bgm.play().catch(e=>{}); isBgmPlaying = true; $('bgmBtn').textContent = '🔊'; }
+    if (!isBgmPlaying) { startAmbient(); isBgmPlaying = true; $('bgmBtn').textContent = '🔊'; }
     
     state = 'spinning';
     targetSpeed = 3.5;
+    startDrums();
     $('startBtn').disabled = true;
     $('stopBtn').disabled = false;
     centerWinners = []; 
