@@ -963,6 +963,10 @@ if (isJoinMode) {
   const ctx = canvas.getContext('2d');
   let W, H, cx, cy, R, dpr;
   let rotY = 0, speed = 0.2, targetSpeed = 0.2;
+  // 旋转轴倾角：让球体明显斜着转(约-28度)，消除两极向中间挤压的观感
+  const AXIS_TILT = -0.49;
+  // 透视焦距：调大后近远缩放差变小，边缘人名不再被压向中心，分布更均匀
+  const FOCAL = 4.2;
   let slots = [], flyers = [], sparks = [], bgStars = [];
   let fx = [], confetti = [], ripples = [], winBurstT = 0;
   const PAL = ['#ff2e63', '#ff9f1c', '#ffe600', '#2de2e6', '#f900ff',
@@ -1055,12 +1059,12 @@ if (isJoinMode) {
   // 按当前旋转角度实时算出某个槽位在屏幕上的位置（点击瞬间的真实位置）
   function slotScreen(s) {
     const cY = Math.cos(rotY), sY = Math.sin(rotY);
-    const cX = Math.cos(-0.18), sX = Math.sin(-0.18);
+    const cX = Math.cos(AXIS_TILT), sX = Math.sin(AXIS_TILT);
     let x = s.bx * cY - s.bz * sY;
     let z = s.bx * sY + s.bz * cY;
     let y = s.by * cX - z * sX;
     z = s.by * sX + z * cX;
-    const persp = 2.4 / (2.4 + z);
+    const persp = FOCAL / (FOCAL + z);
     return { x: cx + x * R * persp, y: cy + y * R * persp };
   }
 
@@ -1114,6 +1118,7 @@ if (isJoinMode) {
 
   // ===== 球体氛围辉光（取代线条轨道） =====
   function drawSphereGlow(now, front) {
+    return; // 已移除球面外圈的蓝光氛围环与两极光晕
     const breathe = 0.85 + 0.15 * Math.sin(now * 0.0008);
     if (!front) {
       const glow = ctx.createRadialGradient(cx, cy, R * 0.15, cx, cy, R * 1.4);
@@ -1190,6 +1195,7 @@ if (isJoinMode) {
 
   // ===== 绚丽中奖特效 =====
   function addExplosion(x, y, color, n) {
+    if (fx.length > 1400) return; // 粒子上限，防止堆叠卡顿
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
       const sp = Math.random() * 8.5 + 2.5;
@@ -1203,6 +1209,7 @@ if (isJoinMode) {
     }
   }
   function addConfetti(x, y, n) {
+    if (confetti.length > 900) return; // 彩带上限
     for (let i = 0; i < n; i++) {
       confetti.push({
         x: x + (rf() - 0.5) * W * 0.35, y: y - H * 0.34 + (rf() - 0.5) * 80,
@@ -1215,6 +1222,7 @@ if (isJoinMode) {
     }
   }
   function addRipples(x, y) {
+    return; // 已移除中奖时向四周扩散的彩色线圈
     for (let i = 0; i < 5; i++) {
       ripples.push({
         x: x, y: y, r: 10 + i * 20, vr: 4.5 + i * 2.2,
@@ -1362,7 +1370,7 @@ if (isJoinMode) {
 
     drawSphereGlow(now, false);  // 球体背侧氛围光
     const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
-    const cosX = Math.cos(-0.18), sinX = Math.sin(-0.18);
+    const cosX = Math.cos(AXIS_TILT), sinX = Math.sin(AXIS_TILT);
     const arr = [];
     
     ensureSlotCapacity();
@@ -1376,7 +1384,7 @@ if (isJoinMode) {
       let y = s.by * cosX - z * sinX;
       z = s.by * sinX + z * cosX;
       
-      const persp = 2.4 / (2.4 + z);
+      const persp = FOCAL / (FOCAL + z);
 
       s.prevSx = s.sx;
       s.prevSy = s.sy;
