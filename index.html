@@ -81,6 +81,16 @@ canvas{display:block;width:100%;height:100%}
 #msg{margin-top:15px;font-size:14px;color:#00f2fe;min-height:20px;line-height:1.6}
 .mcard-tip{margin-top:14px;font-size:12px;color:#6f8fb0;line-height:1.6;border-top:1px solid rgba(90,170,255,.14);padding-top:12px}
 
+/* ---------- 手机搜索区样式 ---------- */
+.m-search-box{margin-top:20px;padding-top:18px;border-top:1px solid rgba(0,242,254,.2);text-align:left}
+.m-search-title{font-size:15px;font-weight:bold;color:#00f2fe;margin-bottom:12px;text-align:center}
+.m-search-box input{width:100%;height:46px;margin-bottom:10px;border-radius:8px;border:1px solid rgba(0,242,254,.3);background:#030610;color:#fff;font-size:15px;padding:0 15px;outline:none;transition:.2s}
+.m-search-box input:focus{border-color:#00f2fe;box-shadow:0 0 12px rgba(0,242,254,.3)}
+.m-search-box button{width:100%;height:42px;border:none;border-radius:8px;background:rgba(0,242,254,.18);color:#00f2fe;font-size:15px;font-weight:bold;cursor:pointer;transition:.2s}
+.m-search-box button:hover{background:rgba(0,242,254,.3)}
+.m-search-box button:active{transform:scale(0.97)}
+#m_searchResult{margin-top:12px;font-size:14px;min-height:22px;line-height:1.7;text-align:center}
+
 /* ---------- 设置弹窗 ---------- */
 #modalOverlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(5px)}
 #modal{width:500px;max-width:90vw;background:#0f1a2e;border:1px solid rgba(0,242,254,.3);border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.8)}
@@ -188,6 +198,12 @@ canvas{display:block;width:100%;height:100%}
     <input id="m_name" placeholder="请输入姓名（必填）" maxlength="20" autocomplete="off">
     <button id="m_submit">提交登记</button>
     <p id="msg"></p>
+    <div class="m-search-box">
+      <div class="m-search-title">查询登记状态</div>
+      <input id="m_search" placeholder="输入姓名查询是否登记成功" maxlength="20" autocomplete="off">
+      <button id="m_searchBtn">查询</button>
+      <p id="m_searchResult"></p>
+    </div>
     <p class="mcard-tip">如提示登记失败，请检查手机网络后重试，或将姓名告知现场工作人员代为录入。</p>
   </div>
 </div>
@@ -829,6 +845,85 @@ if (isJoinMode) {
   setInterval(() => flushQueue(true), 9000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) flushQueue(true); });
 
+  // ======== 搜索登记状态功能 ========
+  // 逻辑：1) 先检查本机记录(mine)是否已提交且已送达(队列中不存在)
+  //       2) 同时通过 HTTP 轮询 ntfy 通道拉取历史消息，搜索目标姓名是否已在通道上
+  async function searchRegistration(queryName) {
+    const name = String(queryName || '').trim().toLowerCase();
+    if (!name) return { found: false, reason: 'empty' };
+
+    // 第一层：本机记录检查
+    const mine = loadMine();
+    const queue = loadQueue();
+    const localMatch = mine.find(m => String(m.name).toLowerCase() === name);
+    const pendingInQueue = queue.some(q => String(q.name).toLowerCase() === name);
+
+    if (localMatch && !pendingInQueue) {
+      return { found: true, reason: 'local_sent', name: localMatch.name };
+    }
+    if (localMatch && pendingInQueue) {
+      return { found: false, reason: 'local_pending', name: localMatch.name };
+    }
+
+    // 第二层：远程通道轮询（ntfy /json 端点保留最近消息）
+    try {
+      const subs = COMM.subs || 8;
+      const server = COMM.server || 'https://ntfy.sh';
+      for (let i = 0; i < subs; i++) {
+        const topicName = (COMM.base || 'lucky600_' + roomId) + '_' + i;
+        const url = server + '/' + topicName + '/json?poll=1&since=all';
+        const ctl = new AbortController();
+        const tm = setTimeout(() => ctl.abort(), 6000);
+        try {
+          const res = await fetch(url, { signal: ctl.signal });
+          clearTimeout(tm);
+          if (!res.ok) continue;
+          const txt = await res.text();
+          for (const line of txt.split('\n')) {
+            if (!line.trim()) continue;
+            let d; try { d = JSON.parse(line); } catch(e) { continue; }
+            const w = wireParse(d && d.message);
+            if (w && String(w.name).toLowerCase() === name) {
+              return { found: true, reason: 'remote', name: w.name };
+            }
+          }
+        } catch(e) { clearTimeout(tm); continue; }
+      }
+    } catch(e) {}
+
+    return { found: false, reason: 'not_found' };
+  }
+
+  $('m_searchBtn').onclick = async () => {
+    const queryName = $('m_search').value;
+    if (!queryName.trim()) { $('m_searchResult').textContent = '请输入要查询的姓名'; $('m_searchResult').style.color = '#ffb020'; return; }
+    $('m_searchBtn').disabled = true;
+    $('m_searchBtn').textContent = '查询中...';
+    $('m_searchResult').textContent = '正在检索登记记录...';
+    $('m_searchResult').style.color = '#9fc4e6';
+
+    const result = await searchRegistration(queryName);
+
+    if (result.found) {
+      $('m_searchResult').innerHTML = '<span style="color:#41ffb0;font-weight:bold">已登记成功</span><br>' +
+        '姓名「' + (result.name || queryName.trim()) + '」已在抽奖名单中，请关注现场大屏';
+    } else if (result.reason === 'local_pending') {
+      $('m_searchResult').innerHTML = '<span style="color:#ffb020;font-weight:bold">登记待发送</span><br>' +
+        '您的登记记录在本机排队中，将自动重试发送到抽奖屏';
+    } else if (result.reason === 'empty') {
+      $('m_searchResult').textContent = '请输入姓名';
+      $('m_searchResult').style.color = '#ffb020';
+    } else {
+      $('m_searchResult').innerHTML = '<span style="color:#ff5e3d;font-weight:bold">未找到登记记录</span><br>' +
+        '请确认姓名拼写正确，或在上方输入姓名提交登记';
+    }
+
+    $('m_searchBtn').disabled = false;
+    $('m_searchBtn').textContent = '查询';
+  };
+
+  $('m_search').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('m_searchBtn').click(); });
+
   // 第三种参与方式：链接直接带姓名（?join=房间号&name=张三），群里接龙或工作人员代录时一键提交
   const autoName = String(urlParams.get('name') || '').trim();
   if (autoName) { $('m_name').value = autoName; setTimeout(() => submitName(autoName), 700); }
@@ -1392,6 +1487,15 @@ if (isJoinMode) {
                 ${p.name}<br><span style="font-size:12px;font-weight:normal">剩余 ${remain} / ${p.quota}</span>
               </div>`;
     }).join('');
+    // 修复：检查是否所有奖项都已抽完，如果是则禁用开始按钮
+    const allDone = prizes.every(p => (p.quota - p.drawn) <= 0);
+    if (allDone && state === 'idle') {
+      $('startBtn').disabled = true;
+      $('startBtn').textContent = '奖项已抽完';
+    } else if (state === 'idle') {
+      $('startBtn').disabled = false;
+      $('startBtn').textContent = '开始抽奖';
+    }
   }
 
   window.selectPrize = (id) => {
@@ -1409,6 +1513,30 @@ if (isJoinMode) {
   // --- 抽奖控制 ---
   $('startBtn').onclick = () => {
     if (state !== 'idle') return;
+
+    // 修复：奖项已抽完 / 无人可抽 时不允许开始，给出明确提示
+    const prize = prizes.find(p => p.id === currentPrizeId);
+    const pool = participants.filter(p => !p.won);
+
+    if (!prize || (prize.quota - prize.drawn) <= 0) {
+      // 自动尝试切换到下一个有剩余名额的奖项
+      const nextPrize = prizes.find(p => (p.quota - p.drawn) > 0);
+      if (nextPrize) {
+        currentPrizeId = nextPrize.id;
+        renderPrizeList();
+        showTip('已自动切换到「' + nextPrize.name + '」，请再点开始抽奖');
+        return;
+      } else {
+        showTip('所有奖项已抽完，请前往设置奖项调整或重置中奖记录');
+        $('startBtn').disabled = true;
+        return;
+      }
+    }
+    if (pool.length === 0) {
+      showTip('当前没有可抽奖的人员，请先扫码登记或使用名单管理录入');
+      return;
+    }
+
     if (!isBgmPlaying) { bgm.play().catch(e=>{}); isBgmPlaying = true; $('bgmBtn').textContent = '🔊'; }
     
     state = 'spinning';
@@ -1430,10 +1558,12 @@ if (isJoinMode) {
     const pool = participants.filter(p => !p.won);
     
     if (!prize || pool.length === 0) {
+      if (pool.length === 0) showTip('没有可抽取的人员（全部已中奖）');
       setTimeout(() => { 
         state = 'idle'; 
         $('startBtn').disabled = false; 
         document.querySelector('.right').classList.remove('is-drawing');
+        renderPrizeList();
       }, 1000);
       return;
     }
@@ -1442,10 +1572,12 @@ if (isJoinMode) {
     batch = Math.min(batch, prize.quota - prize.drawn, pool.length);
     
     if (batch <= 0) {
+      showTip('该奖项名额已用完，无人可继续抽取');
       setTimeout(() => { 
         state = 'idle'; 
         $('startBtn').disabled = false; 
         document.querySelector('.right').classList.remove('is-drawing');
+        renderPrizeList();
       }, 1000);
       return;
     }
