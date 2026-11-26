@@ -12,7 +12,7 @@ body{background:#030610;color:#eaf4ff;font-family:"Microsoft YaHei",sans-serif;o
 
 /* ---------- 大屏端样式 ---------- */
 #screen{height:100vh;display:flex;flex-direction:column;position:relative;z-index:10}
-header{height:70px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 20px;border-bottom:none;background:rgba(8,20,40,.22);backdrop-filter:blur(10px)}
+header{height:70px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 20px;border-bottom:none;background:rgba(6,14,28,.34)}
 .brand{font-size:32px;font-weight:900;letter-spacing:4px;background:linear-gradient(90deg,#00f2fe,#4facfe,#00f2fe);-webkit-background-clip:text;color:transparent;text-shadow:0 0 20px rgba(0,242,254,.4)}
 .header-right{display:flex;align-items:center;gap:14px;min-width:0}
 .count{font-size:18px;color:#bfe0ff}
@@ -30,7 +30,7 @@ transition:opacity .25s;box-shadow:0 6px 24px rgba(0,0,0,.5)}
 #tipToast.show{opacity:1}
 
 main{flex:1;display:flex;min-height:0}
-.left{width:280px;background:linear-gradient(180deg, rgba(8,20,40,.26), rgba(3,6,16,.14));padding:15px;border-right:none;overflow-y:auto;backdrop-filter:blur(5px)}
+.left{width:280px;background:linear-gradient(180deg, rgba(8,20,40,.34), rgba(3,6,16,.18));padding:46px 15px 15px;border-right:none;overflow-y:auto}
 .left::-webkit-scrollbar, .right::-webkit-scrollbar { display: none; }
 .left, .right { -ms-overflow-style: none; scrollbar-width: none; }
 
@@ -41,7 +41,7 @@ main{flex:1;display:flex;min-height:0}
 .btn-export:hover{background:rgba(0,242,254,.26);color:#eafcff;border-color:#00f2fe;box-shadow:0 0 12px rgba(0,242,254,.4)}
 .btn-export:active{transform:scale(.96)}
 .btn-export:disabled{opacity:.4;cursor:not-allowed;background:rgba(120,150,180,.1);border-color:rgba(120,150,180,.25);color:#7f9bb5;box-shadow:none}
-#winnerList{max-height:calc(100vh - 130px);overflow-y:auto;overflow-x:hidden;padding-right:2px}
+#winnerList{max-height:calc(100vh - 176px);overflow-y:auto;overflow-x:hidden;padding-right:2px}
 #winnerList::-webkit-scrollbar{width:6px;display:block}
 #winnerList::-webkit-scrollbar-thumb{background:rgba(0,242,254,.4);border-radius:3px}
 #winnerList::-webkit-scrollbar-track{background:transparent}
@@ -57,7 +57,7 @@ main{flex:1;display:flex;min-height:0}
 canvas{display:block;width:100%;height:100%}
 
 /* 右侧操作区 */
-.right{width:280px;background:linear-gradient(180deg, rgba(8,20,40,.26), rgba(3,6,16,.14));padding:20px;border-left:none;display:flex;flex-direction:column;gap:12px;backdrop-filter:blur(5px)}
+.right{width:280px;background:linear-gradient(180deg, rgba(8,20,40,.34), rgba(3,6,16,.18));padding:46px 20px 20px;border-left:none;display:flex;flex-direction:column;gap:12px}
 .prize-btn{padding:14px;border-radius:8px;border:1px solid rgba(0,242,254,.2);background:rgba(15,30,55,.7);cursor:pointer;text-align:center;font-size:16px;font-weight:bold;transition:.3s;position:relative;overflow:hidden}
 .prize-btn:not(.done):hover{border-color:#00f2fe;box-shadow:0 0 15px rgba(0,242,254,.4)}
 .prize-btn.active{border-color:#ffd700;background:rgba(60,50,10,.6);box-shadow:0 0 20px rgba(255,215,0,.4);color:#ffd700;text-shadow:0 0 10px rgba(255,215,0,.5)}
@@ -1159,19 +1159,29 @@ if (isJoinMode) {
     return pt;
   }
 
-  function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 1.5);   // 高分屏封顶到 1.5，像素量大幅下降
+  let dprApplied = -1;
+  function wantDpr() {
+    // 自适应分辨率：人数越多，画布像素量越低（这是旋转卡顿最直接的收益）
+    const n = participants.length;
+    const cap = n > 500 ? 1 : n > 300 ? 1.1 : 1.25;
+    return Math.min(window.devicePixelRatio || 1, cap);
+  }
+  function resize(force) {
+    const nd = wantDpr();
+    if (!force && nd === dprApplied) return;   // 分辨率未变化就不重建画布
+    dprApplied = nd;
+    dpr = nd;
     W = canvas.clientWidth;
     H = canvas.clientHeight;
     canvas.width = W * dpr;
     canvas.height = H * dpr;
-    ctx.scale(dpr, dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     SPRITE.dpr = dpr;
     textSpriteCache.clear();
     buildDotSprite();
     cx = W / 2; cy = H / 2; R = Math.min(W, H) * 0.38;
   }
-  window.addEventListener('resize', resize);
+  window.addEventListener('resize', function () { resize(true); });
 
   // ===== 球体氛围辉光（取代线条轨道） =====
   function drawSphereGlow(now, front) {
@@ -1261,7 +1271,8 @@ if (isJoinMode) {
   }
 
   function createSparks(x, y, color = '#00f2fe') {
-    for (let i = 0; i < 40; i++) {
+    if (sparks.length > 500) return;   // 火花总量护栏
+    for (let i = 0; i < 18; i++) {
       const angle = Math.random() * Math.PI * 2;
       const spd = Math.random() * 10 + 3;
       sparks.push({
@@ -1273,7 +1284,7 @@ if (isJoinMode) {
 
   // ===== 绚丽中奖特效 =====
   function addExplosion(x, y, color, n) {
-    if (fx.length > 1400) return; // 粒子上限，防止堆叠卡顿
+    if (fx.length > 900) return; // 粒子上限，防止堆叠卡顿
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
       const sp = Math.random() * 8.5 + 2.5;
@@ -1309,20 +1320,17 @@ if (isJoinMode) {
     }
   }
   function launchCelebration(x, y) {
-    const bursts = 4 + ((rf() * 4) | 0);
+    const bursts = 3 + ((rf() * 2) | 0);
     for (let b = 0; b < bursts; b++) {
       const bx = x + (rf() - 0.5) * W * 0.62;
       const by = y - H * 0.08 - rf() * H * 0.30;
-      addExplosion(bx, by, PAL[(rf() * PAL.length) | 0], 110);
-      addRipples(bx, by);
+      addExplosion(bx, by, PAL[(rf() * PAL.length) | 0], 70);
     }
-    addExplosion(x, y, '#ffd700', 95);
-    addRipples(x, y);
-    addConfetti(x, y, 200);
-    // 顶部持续彩带雨，营造庆典满屏氛围
-    setTimeout(function () { addConfetti(x, y - H * 0.1, 90); }, 320);
-    setTimeout(function () { addExplosion(x - W * 0.3, y - H * 0.05, PAL[(rf() * PAL.length) | 0], 80); }, 460);
-    setTimeout(function () { addExplosion(x + W * 0.3, y - H * 0.05, PAL[(rf() * PAL.length) | 0], 80); }, 620);
+    addExplosion(x, y, '#ffd700', 80);          // 主爆点落在中奖名字位置
+    addConfetti(x, y, 140);
+    setTimeout(function () { addConfetti(x, y - H * 0.1, 70); }, 320);
+    setTimeout(function () { addExplosion(x - W * 0.16, y - H * 0.05, PAL[(rf() * PAL.length) | 0], 55); }, 460);
+    setTimeout(function () { addExplosion(x + W * 0.16, y - H * 0.05, PAL[(rf() * PAL.length) | 0], 55); }, 620);
   }
 
   function update(dt, now) {
@@ -1334,38 +1342,51 @@ if (isJoinMode) {
       if (s.y < 0) { s.y = H; s.x = Math.random() * W; }
     });
 
-    for (let i = sparks.length - 1; i >= 0; i--) {
+    // 粒子数组改为“原地压缩”清理失效项：splice 每次删除都要整体搬移，
+    // 上千粒子时会拖垮帧率（这是中奖庆祝卡顿的另一大来源）
+    let wi = 0;
+    for (let i = 0; i < sparks.length; i++) {
       const p = sparks[i];
       p.x += p.vx; p.y += p.vy;
       p.vx *= 0.95; p.vy *= 0.95;
       p.life -= p.decay;
-      if (p.life <= 0) sparks.splice(i, 1);
+      if (p.life > 0) sparks[wi++] = p;
     }
+    sparks.length = wi;
 
-    // 庆祝特效推进
-    for (let i = fx.length - 1; i >= 0; i--) {
+    wi = 0;
+    for (let i = 0; i < fx.length; i++) {
       const p = fx[i];
       p.vy += p.g; p.vx *= 0.98; p.vy *= 0.98;
       p.x += p.vx; p.y += p.vy; p.life -= p.decay;
-      if (p.life <= 0) fx.splice(i, 1);
+      if (p.life > 0) fx[wi++] = p;
     }
-    for (let i = confetti.length - 1; i >= 0; i--) {
+    fx.length = wi;
+
+    wi = 0;
+    for (let i = 0; i < confetti.length; i++) {
       const c = confetti[i];
       c.vy += c.g; c.vx *= 0.99;
       c.x += c.vx; c.y += c.vy; c.rot += c.vrot; c.life -= c.decay;
-      if (c.life <= 0 || c.y > H + 40) confetti.splice(i, 1);
+      if (c.life > 0 && c.y <= H + 40) confetti[wi++] = c;
     }
-    for (let i = ripples.length - 1; i >= 0; i--) {
+    confetti.length = wi;
+
+    wi = 0;
+    for (let i = 0; i < ripples.length; i++) {
       const r = ripples[i];
       r.r += r.vr; r.life -= r.decay;
-      if (r.life <= 0) ripples.splice(i, 1);
+      if (r.life > 0) ripples[wi++] = r;
     }
+    ripples.length = wi;
     if (centerWinners.length > 0) {
       winBurstT -= dt;
       if (winBurstT <= 0) {
-        winBurstT = 0.3;
-        addExplosion(cx + (rf() - 0.5) * W * 0.7, cy + (rf() - 0.5) * H * 0.5,
-                     PAL[secureRandInt(PAL.length)], 46);
+        winBurstT = 0.5;
+        if (fx.length < 420) {         // 粒子有余额才补爆，庆祝期间不再堆帧
+          addExplosion(cx + (rf() - 0.5) * W * 0.7, cy + (rf() - 0.5) * H * 0.5,
+                       PAL[secureRandInt(PAL.length)], 34);
+        }
       }
     }
 
@@ -1419,6 +1440,11 @@ if (isJoinMode) {
     }
   }
 
+  // ===== 渲染性能基础设施：字体串缓存 / 复用渲染项 / 稳定排序（降低每帧分配与 GC 抖动） =====
+  const FONT_CACHE = new Map();
+  const renderItems = [];
+  function sortByDepth(a, b) { return a.z - b.z; }
+
   function draw(now) {
     if (!W) return;
     ctx.clearRect(0, 0, W, H);
@@ -1426,107 +1452,124 @@ if (isJoinMode) {
     ctx.fillStyle = '#030610';
     ctx.fillRect(0, 0, W, H);
     
-    bgStars.forEach(s => {
+    ctx.fillStyle = 'rgb(160, 225, 255)';
+    for (const s of bgStars) {
       const tw = 0.6 + 0.4 * Math.sin(now * 0.001 + s.a * 12);
-      ctx.fillStyle = `rgba(160, 225, 255, ${(s.a * tw).toFixed(3)})`;
+      ctx.globalAlpha = s.a * tw;
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.s * (0.8 + tw * 0.3), 0, Math.PI*2);
       ctx.fill();
-    });
-
-    const bg = ctx.createRadialGradient(cx, cy, R*0.1, cx, cy, R*1.8);
-    if (state === 'spinning') {
-      const pulse = Math.abs(Math.sin(now / 150));
-      bg.addColorStop(0, `rgba(0, 242, 254, ${0.15 + pulse*0.1})`);
-      bg.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    } else if (centerWinners.length > 0) {
-      bg.addColorStop(0, 'rgba(255, 215, 0, 0.25)'); 
-      bg.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    } else {
-      bg.addColorStop(0, 'rgba(0, 242, 254, 0.05)');
-      bg.addColorStop(1, 'rgba(0, 0, 0, 0)');
     }
+    ctx.globalAlpha = 1;
+
+    // ===== 球心淡蓝氛围光：全过程常驻（打开界面即有，开始/停止/中奖都不消失） =====
+    const breathe = 0.85 + 0.15 * Math.sin(now * 0.0008);
+    const coreA = state === 'spinning'
+      ? (0.15 + Math.abs(Math.sin(now / 150)) * 0.07)
+      : 0.15;
+    const bg = ctx.createRadialGradient(cx, cy, R * 0.05, cx, cy, R * 1.4);
+    bg.addColorStop(0, 'rgba(0, 242, 254, ' + (coreA * breathe).toFixed(3) + ')');
+    bg.addColorStop(0.5, 'rgba(0, 150, 254, ' + (coreA * 0.45 * breathe).toFixed(3) + ')');
+    bg.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(cx - R * 1.4, cy - R * 1.4, R * 2.8, R * 2.8);   // 只铺球体范围，比整屏填充更省
+    if (centerWinners.length > 0) {
+      const gd = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R * 1.2);
+      gd.addColorStop(0, 'rgba(255, 215, 0, 0.12)');
+      gd.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = gd;
+      ctx.fillRect(cx - R * 1.2, cy - R * 1.2, R * 2.4, R * 2.4);
+    }
 
     drawSphereGlow(now, false);  // 球体背侧氛围光
     const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
     const cosX = Math.cos(AXIS_TILT), sinX = Math.sin(AXIS_TILT);
-    const arr = [];
-    
+
     ensureSlotCapacity();
     const pool = participants.filter(p => !p.won);
     assignNamesToSlots(pool);   // 无人登记 → 全部是光点；有人登记 → 光点逐个替换成人名
 
-    // ===== 分层渲染阈值：按景深 z 分三档，兼顾特效观感与帧率 =====
-    const FRONT_MIN = 0, MID_MIN = -0.15;           // 前半球 / 中半球 / 后半球
-    const TRAIL_FRAMES = pool.length > 500 ? 2 : 3; // 人多时拖影帧数减半
-    const TRAIL_ALPHA = 0.3;
-    
+    // ===== 性能分层：发光强度按人数自动收窄，特效观感不丢 =====
+    const FRONT_MIN = 0;                        // 光点拖影的前半球阈值
+    const GLOW_TIER = pool.length > 650 ? 0 : pool.length > 450 ? 5 : 12;   // 淡蓝光影半径
+    const GLOW_MIN_Z = GLOW_TIER >= 10 ? -0.35 : 0;   // 人多时发光集中偏正面，边缘一圈仍保留描边光
+    const needHist = MAX <= 300;                // 槽位很多时不记录历史帧（省掉每帧数百次对象分配）
+    const dotPerf = MAX > 300;                  // 槽位很多时关光点拖影
+    const nameFill = 'rgb(' + NAME_RGB + ')';
+
+    // 复用渲染项对象，避免每帧新建 600+ 个对象引起 GC 抖动（旋转卡顿来源之一）
+    const arr = renderItems;
+    let freeCnt = 0;
     for (let i = 0; i < MAX; i++) {
       const s = slots[i];
       let x = s.bx * cosY - s.bz * sinY;
       let z = s.bx * sinY + s.bz * cosY;
       let y = s.by * cosX - z * sinX;
       z = s.by * sinX + z * cosX;
-      
+
       const persp = FOCAL / (FOCAL + z);
 
-      s.prevSx = s.sx;
-      s.prevSy = s.sy;
       s.sx = cx + x * R * persp;
       s.sy = cy + y * R * persp;
       s.sz = z;
       s.persp = persp;
 
-      if (!s.hist) s.hist = [];
-      s.hist.push({ x: s.sx, y: s.sy });
-      while (s.hist.length > TRAIL_FRAMES + 1) s.hist.shift();
+      if (needHist) {
+        if (!s.hist) s.hist = [];
+        s.hist.push({ x: s.sx, y: s.sy });
+        while (s.hist.length > 3) s.hist.shift();
+      } else if (s.hist && s.hist.length) {
+        s.hist.length = 0;
+      }
 
-      arr.push({ x: s.sx, y: s.sy, z: z, persp: persp, name: s.name, seed: s.seed, prevSx: s.prevSx, prevSy: s.prevSy, hist: s.hist });
+      const it = arr[i] || (arr[i] = {});
+      it.x = s.sx; it.y = s.sy; it.z = z; it.persp = persp;
+      it.name = s.name; it.seed = s.seed; it.hist = s.hist;
+      if (!s.name) freeCnt++;
     }
-    
-    arr.sort((a, b) => a.z - b.z);
+    arr.length = MAX;
+
+    arr.sort(sortByDepth);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const dotPerf = MAX > 300;                   // 槽位很多时关光点阴影
-    const perfOff = pool.length > 450;              // 人多时关逐字发光阴影，保帧率
-    const showDots = true;                       // 光点常驻：人少铺满、人多逐减
-    // 光点随人数主动递减：绑定人数越多，保留显示的空槽光点越少，避免堆积卡顿
-    const boundCnt = MAX - freeDotCount(arr);
-    const dotTarget = Math.max(40, Math.round(220 - boundCnt * 0.30));
-    const dotKeepRatio = Math.min(1, dotTarget / Math.max(1, freeDotCount(arr)));
 
-    function freeDotCount(list) {
-      let n = 0; for (const it of list) if (!it.name) n++;
-      return n;
-    }
+    // 光点随人数主动递减：绑定人数越多，保留显示的空槽光点越少，避免堆积卡顿
+    const boundCnt = MAX - freeCnt;
+    const dotTarget = Math.max(40, Math.round(220 - boundCnt * 0.30));
+    const dotKeepRatio = Math.min(1, dotTarget / Math.max(1, freeCnt));
+
     for (const a of arr) {
       if (a.name) {
         const depth = (a.z + 1) / 2;
         const alpha = 0.2 + depth * 0.8;
         const size = 10 + a.persp * 9;
-        // 人名由文字本身发光：每帧在当前位置直接绘制带 shadowBlur 的文字，
-        // 光影是文字自身属性（含球体边缘一圈名字），不再有独立贴图跟随、也不做逐帧重复绘制拖影。
-        const glowOn = (a.z > -0.35) && !perfOff;
+        const fsz = Math.round(size);
+        let font = FONT_CACHE.get(fsz);
+        if (!font) { font = 'bold ' + fsz + 'px "Microsoft YaHei"'; FONT_CACHE.set(fsz, font); }
+        // 人名由文字本身发光：光影是文字自身属性，随字一起发光、随字一起移动，
+        // 不使用贴图跟随，也不做逐帧重复绘制拖影；球体边缘（z≈0）同样带效果。
+        const front = a.z > -0.35;
+        const glowOn = GLOW_TIER > 0 && a.z > GLOW_MIN_Z;
         ctx.globalAlpha = alpha;
-        ctx.font = 'bold ' + size.toFixed(1) + 'px "Microsoft YaHei"';
-        ctx.lineWidth = Math.max(1, size * 0.10);
-        ctx.strokeStyle = TECH_STROKE;
-        ctx.strokeText(a.name, a.x, a.y);
-        if (glowOn) { ctx.shadowColor = NAME_GLOW; ctx.shadowBlur = 12; }
-        ctx.fillStyle = 'rgb(' + NAME_RGB + ')';
+        ctx.font = font;
+        if (front) {
+          ctx.lineWidth = Math.max(1, size * 0.10);
+          ctx.strokeStyle = TECH_STROKE;
+          ctx.strokeText(a.name, a.x, a.y);
+        }
+        if (glowOn) { ctx.shadowColor = NAME_GLOW; ctx.shadowBlur = GLOW_TIER; }
+        ctx.fillStyle = nameFill;
         ctx.fillText(a.name, a.x, a.y);
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
-      } else if (showDots && a.seed < dotKeepRatio) {
+      } else if (a.seed < dotKeepRatio) {
         const depth = (a.z + 1) / 2;
         const tw = 0.65 + 0.35 * Math.sin(now * 0.0022 + a.seed * 6.283);
         const rad = (1.2 + depth * 2.0) * a.persp;
         const dotA = (0.2 + depth * 0.6) * tw;
         if (DOT_SPRITE) {
           const ds = rad * 6.0;
-          if (!dotPerf && a.z > FRONT_MIN) {
+          if (!dotPerf && a.z > FRONT_MIN && a.hist && a.hist.length > 1) {
             const dn = a.hist.length;
             for (let i = 0; i < dn - 1; i++) {
               const frac = i / dn; const ta = dotA * 0.3 * frac; if (ta < 0.02) continue;
@@ -1571,37 +1614,55 @@ if (isJoinMode) {
       }
     }
 
-    // 粒子
-    for (const p of sparks) {
-      ctx.globalAlpha = p.life;
-      ctx.fillStyle = p.color;
-      ctx.shadowColor = p.color;
-      ctx.shadowBlur = 10;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 4 * p.life, 0, Math.PI * 2);
-      ctx.fill();
+    // 火花粒子：同样走加色混合，无 shadowBlur
+    if (sparks.length > 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of sparks) {
+        const rr = 4 * p.life;
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, p.life) * 0.16;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, rr * 3, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, rr, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
     }
-    ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
 
-    // ===== 庆祝特效绘制：涟漪 / 彩色爆闪 / 彩带 =====
-    for (const r of ripples) {
-      ctx.globalAlpha = Math.max(0, r.life) * 0.6;
-      ctx.strokeStyle = r.color;
-      ctx.lineWidth = 2 + r.life * 3;
-      ctx.beginPath();
-      ctx.arc(r.x, r.y, r.r, 0, 6.283);
-      ctx.stroke();
+    // ===== 庆祝特效绘制：彩色爆闪（涟漪已停用） =====
+    if (ripples.length > 0) {
+      for (const r of ripples) {
+        ctx.globalAlpha = Math.max(0, r.life) * 0.6;
+        ctx.strokeStyle = r.color;
+        ctx.lineWidth = 2 + r.life * 3;
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, r.r, 0, Math.PI*2);
+        ctx.stroke();
+      }
     }
-    for (const p of fx) {
-      const tw = 0.7 + 0.3 * Math.sin(now * 0.02 + p.tw);
-      ctx.globalAlpha = Math.max(0, p.life);
-      ctx.fillStyle = p.color;
-      ctx.shadowColor = p.color;
-      ctx.shadowBlur = 8 * tw;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r * (0.4 + p.life), 0, 6.283);
-      ctx.fill();
+    if (fx.length > 0) {
+      // 爆闪粒子改用“加色混合 + 双层圆”叠出光晕，不再逐粒子 shadowBlur
+      // （逐粒子阴影是中奖特效期间掉帧的最大来源）
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of fx) {
+        const tw = 0.7 + 0.3 * Math.sin(now * 0.02 + p.tw);
+        const life = Math.max(0, p.life);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = life * 0.20 * tw;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 3.4, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = life;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * (0.4 + p.life), 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
     }
     for (const c of confetti) {
       ctx.globalAlpha = Math.max(0, c.life);
@@ -1621,14 +1682,14 @@ if (isJoinMode) {
       const w = centerWinners[0];
       const age = (now - w.born) / 1000;
       
-      const spotlight = ctx.createRadialGradient(cx, cy, 0, cx, cy, 500);
-      spotlight.addColorStop(0, 'rgba(255, 215, 0, 0.4)');
-      spotlight.addColorStop(0.5, 'rgba(0, 242, 254, 0.1)');
+      const spotlight = ctx.createRadialGradient(cx, cy, 0, cx, cy, 460);
+      spotlight.addColorStop(0, 'rgba(255, 215, 0, 0.32)');
+      spotlight.addColorStop(0.5, 'rgba(0, 242, 254, 0.10)');
       spotlight.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = spotlight;
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(cx - 460, cy - 460, 920, 920);
 
-      const beamN = 12, beamRot = now * 0.0007;
+      const beamN = 9, beamRot = now * 0.0007;
       for (let i = 0; i < beamN; i++) {
         const a = beamRot + i / beamN * 6.283;
         const len = 320 + 130 * Math.sin(now * 0.003 + i);
@@ -1662,14 +1723,14 @@ if (isJoinMode) {
       ctx.textBaseline = 'middle';
       
       ctx.shadowColor = '#00f2fe';
-      ctx.shadowBlur = 120;
+      ctx.shadowBlur = 55;
       ctx.fillStyle = '#fff';
       ctx.fillText(w.name, 0, 0);
       
       ctx.lineWidth = 9;
       ctx.strokeStyle = 'hsla(' + ((now * 0.18) % 360) + ', 100%, 60%, 0.85)';
       ctx.shadowColor = 'hsl(' + ((now * 0.18) % 360) + ', 100%, 60%)';
-      ctx.shadowBlur = 34;
+      ctx.shadowBlur = 18;
       ctx.strokeText(w.name, 0, 0);
       ctx.lineWidth = 6;
       ctx.strokeStyle = '#ffd700';
@@ -1683,7 +1744,7 @@ if (isJoinMode) {
       grad.addColorStop(1, '#ff8c00');
       ctx.fillStyle = grad;
       
-      ctx.shadowBlur = 40;
+      ctx.shadowBlur = 22;
       ctx.shadowColor = '#ffd700';
       ctx.fillText(w.name, 0, 0);
 
@@ -1694,9 +1755,14 @@ if (isJoinMode) {
   }
 
   let lastTime = performance.now();
+  let dprCheckAt = 0;
   function frame(now) {
     const dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
+    if (now - dprCheckAt > 800) {      // 人数变化后自动切换分辨率档位，无需刷新页面
+      dprCheckAt = now;
+      resize(false);
+    }
     update(dt, now);
     draw(now);
     requestAnimationFrame(frame);
