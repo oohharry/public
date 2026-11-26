@@ -23,10 +23,6 @@ header{height:70px;display:flex;align-items:center;justify-content:space-between
 #settingBtn:hover{background:rgba(0,242,254,.2)}
 #rosterBtn{height:36px;padding:0 14px;white-space:nowrap;border:1px solid rgba(0,242,254,.5);border-radius:8px;background:rgba(0,242,254,.1);color:#00f2fe;font-size:14px;cursor:pointer;transition:.2s}
 #rosterBtn:hover{background:rgba(0,242,254,.2)}
-#fullscreenBtn{height:36px;padding:0 14px;white-space:nowrap;border:1px solid rgba(0,242,254,.5);border-radius:8px;background:rgba(0,242,254,.1);color:#00f2fe;font-size:14px;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:6px;flex:none}
-#fullscreenBtn:hover{background:rgba(0,242,254,.2);box-shadow:0 0 12px rgba(0,242,254,.35)}
-#fullscreenBtn:active{transform:scale(0.95)}
-#fullscreenBtn svg{flex:none}
 #tipToast{position:fixed;top:84px;left:50%;transform:translateX(-50%);z-index:300;
 background:rgba(8,20,40,.92);border:1px solid rgba(0,242,254,.5);color:#eaf4ff;
 padding:10px 22px;border-radius:24px;font-size:15px;opacity:0;pointer-events:none;
@@ -168,7 +164,6 @@ canvas{display:block;width:100%;height:100%}
       <button id="showQrBtn">📱 扫码参与</button>
       <button id="rosterBtn">名单管理</button>
       <button id="settingBtn">⚙️ 设置奖项</button>
-      <button id="fullscreenBtn" type="button" title="全屏显示大屏（快捷键 F）"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9V3h6"/><path d="M21 9V3h-6"/><path d="M3 15v6h6"/><path d="M21 15v6h-6"/></svg><span>全屏</span></button>
     </div>
   </header>
   <main>
@@ -969,6 +964,9 @@ if (isJoinMode) {
   let W, H, cx, cy, R, dpr;
   let rotY = 0, speed = 0.2, targetSpeed = 0.2;
   let slots = [], flyers = [], sparks = [], bgStars = [];
+  let fx = [], confetti = [], ripples = [], winBurstT = 0;
+  const PAL = ['#ff2e63', '#ff9f1c', '#ffe600', '#2de2e6', '#f900ff',
+               '#00f2fe', '#7cff00', '#ff5e3d', '#ffd700', '#b388ff', '#ff4fd8', '#5ef2a0'];
   let state = 'idle'; 
   let currentPrizeId = null;
   let centerWinners = []; 
@@ -1180,7 +1178,7 @@ if (isJoinMode) {
   }
 
   function createSparks(x, y, color = '#00f2fe') {
-    for (let i = 0; i < 80; i++) {
+    for (let i = 0; i < 40; i++) {
       const angle = Math.random() * Math.PI * 2;
       const spd = Math.random() * 10 + 3;
       sparks.push({
@@ -1188,6 +1186,57 @@ if (isJoinMode) {
         life: 1, decay: Math.random() * 0.02 + 0.015, color: color
       });
     }
+  }
+
+  // ===== 绚丽中奖特效 =====
+  function addExplosion(x, y, color, n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = Math.random() * 8.5 + 2.5;
+      const cc = rf() < 0.30 ? '#ffffff' : (rf() < 0.55 ? PAL[(rf() * PAL.length) | 0] : color);
+      fx.push({
+        x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.5,
+        life: 1, decay: Math.random() * 0.014 + 0.008,
+        color: cc,
+        g: 0.12, r: Math.random() * 3.2 + 1.6, tw: Math.random() * 6.283
+      });
+    }
+  }
+  function addConfetti(x, y, n) {
+    for (let i = 0; i < n; i++) {
+      confetti.push({
+        x: x + (rf() - 0.5) * W * 0.35, y: y - H * 0.34 + (rf() - 0.5) * 80,
+        vx: (rf() - 0.5) * 4, vy: -rf() * 2 - 0.5,
+        rot: rf() * 6.283, vrot: (rf() - 0.5) * 0.45,
+        w: 7 + rf() * 8, h: 5 + rf() * 7,
+        color: PAL[(rf() * PAL.length) | 0],
+        life: 1, decay: 0.005 + rf() * 0.006, g: 0.12
+      });
+    }
+  }
+  function addRipples(x, y) {
+    for (let i = 0; i < 5; i++) {
+      ripples.push({
+        x: x, y: y, r: 10 + i * 20, vr: 4.5 + i * 2.2,
+        life: 1, decay: 0.014 + i * 0.003, color: PAL[(rf() * PAL.length) | 0]
+      });
+    }
+  }
+  function launchCelebration(x, y) {
+    const bursts = 4 + ((rf() * 4) | 0);
+    for (let b = 0; b < bursts; b++) {
+      const bx = x + (rf() - 0.5) * W * 0.62;
+      const by = y - H * 0.08 - rf() * H * 0.30;
+      addExplosion(bx, by, PAL[(rf() * PAL.length) | 0], 110);
+      addRipples(bx, by);
+    }
+    addExplosion(x, y, '#ffd700', 95);
+    addRipples(x, y);
+    addConfetti(x, y, 200);
+    // 顶部持续彩带雨，营造庆典满屏氛围
+    setTimeout(function () { addConfetti(x, y - H * 0.1, 90); }, 320);
+    setTimeout(function () { addExplosion(x - W * 0.3, y - H * 0.05, PAL[(rf() * PAL.length) | 0], 80); }, 460);
+    setTimeout(function () { addExplosion(x + W * 0.3, y - H * 0.05, PAL[(rf() * PAL.length) | 0], 80); }, 620);
   }
 
   function update(dt, now) {
@@ -1205,6 +1254,33 @@ if (isJoinMode) {
       p.vx *= 0.95; p.vy *= 0.95;
       p.life -= p.decay;
       if (p.life <= 0) sparks.splice(i, 1);
+    }
+
+    // 庆祝特效推进
+    for (let i = fx.length - 1; i >= 0; i--) {
+      const p = fx[i];
+      p.vy += p.g; p.vx *= 0.98; p.vy *= 0.98;
+      p.x += p.vx; p.y += p.vy; p.life -= p.decay;
+      if (p.life <= 0) fx.splice(i, 1);
+    }
+    for (let i = confetti.length - 1; i >= 0; i--) {
+      const c = confetti[i];
+      c.vy += c.g; c.vx *= 0.99;
+      c.x += c.vx; c.y += c.vy; c.rot += c.vrot; c.life -= c.decay;
+      if (c.life <= 0 || c.y > H + 40) confetti.splice(i, 1);
+    }
+    for (let i = ripples.length - 1; i >= 0; i--) {
+      const r = ripples[i];
+      r.r += r.vr; r.life -= r.decay;
+      if (r.life <= 0) ripples.splice(i, 1);
+    }
+    if (centerWinners.length > 0) {
+      winBurstT -= dt;
+      if (winBurstT <= 0) {
+        winBurstT = 0.3;
+        addExplosion(cx + (rf() - 0.5) * W * 0.7, cy + (rf() - 0.5) * H * 0.5,
+                     PAL[secureRandInt(PAL.length)], 46);
+      }
     }
 
     // 彗星飞行
@@ -1226,8 +1302,11 @@ if (isJoinMode) {
       if (t >= 1 && !f.arrived) {
         f.arrived = true;
         centerWinners.push({ name: f.name, born: now, expire: now + 3000 });
+        if (f.rec) { winners.push(f.rec); renderWinners(); saveData(); }
         createSparks(cx, cy, '#00f2fe'); 
         createSparks(cx, cy, '#ffd700');
+        launchCelebration(cx, cy);
+        winBurstT = 0;
       }
     }
     flyers = flyers.filter(f => !f.arrived);
@@ -1312,33 +1391,50 @@ if (isJoinMode) {
     arr.sort((a, b) => a.z - b.z);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    const perfMode = pool.length > 200;          // 人多时优先流畅：关文字阴影/拖尾
+    const dotPerf = MAX > 300;
+    const showDots = true;                       // 光点常驻：人少铺满、人多逐减
+    // 光点随人数主动递减：绑定人数越多，保留显示的空槽光点越少，避免堆积卡顿
+    const boundCnt = MAX - freeDotCount(arr);
+    const dotTarget = Math.max(40, Math.round(220 - boundCnt * 0.30));
+    const dotKeepRatio = Math.min(1, dotTarget / Math.max(1, freeDotCount(arr)));
 
+    function freeDotCount(list) {
+      let n = 0; for (const it of list) if (!it.name) n++;
+      return n;
+    }
     for (const a of arr) {
       if (a.name) {
         const depth = (a.z + 1) / 2;
         const alpha = 0.2 + depth * 0.8;
         const size = 10 + a.persp * 9;
         ctx.font = `bold ${size.toFixed(1)}px "Microsoft YaHei"`;
-        drawMotionTrail(a.x, a.y, a.prevSx, a.prevSy, alpha * 0.5, size, true, a.name);
-        ctx.shadowColor = NAME_GLOW;
-        ctx.shadowBlur = a.persp * 14;
-        ctx.fillStyle = `rgba(${NAME_RGB}, ${alpha.toFixed(3)})`;
-        ctx.fillText(a.name, a.x, a.y);
-        ctx.shadowBlur = a.persp * 5;
-        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.12).toFixed(3)})`;
-        ctx.fillText(a.name, a.x, a.y);
-        ctx.shadowBlur = 0;
-      } else {
+        if (!perfMode) drawMotionTrail(a.x, a.y, a.prevSx, a.prevSy, alpha * 0.5, size, true, a.name);
+        if (perfMode) {
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = `rgba(${NAME_RGB}, ${alpha.toFixed(3)})`;
+          ctx.fillText(a.name, a.x, a.y);
+        } else {
+          ctx.shadowColor = NAME_GLOW;
+          ctx.shadowBlur = a.persp * 14;
+          ctx.fillStyle = `rgba(${NAME_RGB}, ${alpha.toFixed(3)})`;
+          ctx.fillText(a.name, a.x, a.y);
+          ctx.shadowBlur = a.persp * 5;
+          ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.12).toFixed(3)})`;
+          ctx.fillText(a.name, a.x, a.y);
+          ctx.shadowBlur = 0;
+        }
+      } else if (showDots && a.seed < dotKeepRatio) {
         const depth = (a.z + 1) / 2;
         const tw = 0.65 + 0.35 * Math.sin(now * 0.0022 + a.seed * 6.283);
         const rad = (1.2 + depth * 2.0) * a.persp;
         const dotA = (0.2 + depth * 0.6) * tw;
-        drawMotionTrail(a.x, a.y, a.prevSx, a.prevSy, dotA * 0.3, rad, false, null);
+        if (!dotPerf) drawMotionTrail(a.x, a.y, a.prevSx, a.prevSy, dotA * 0.3, rad, false, null);
         ctx.beginPath();
         ctx.arc(a.x, a.y, rad, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${DOT_RGB}, ${dotA.toFixed(3)})`;
         ctx.shadowColor = 'rgba(0, 242, 254, 0.9)';
-        ctx.shadowBlur = depth * 12;
+        ctx.shadowBlur = dotPerf ? 0 : depth * 12;
         ctx.fill();
         ctx.beginPath();
         ctx.arc(a.x, a.y, rad * 0.35, 0, Math.PI * 2);
@@ -1391,6 +1487,38 @@ if (isJoinMode) {
     ctx.globalAlpha = 1;
     ctx.shadowBlur = 0;
 
+    // ===== 庆祝特效绘制：涟漪 / 彩色爆闪 / 彩带 =====
+    for (const r of ripples) {
+      ctx.globalAlpha = Math.max(0, r.life) * 0.6;
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = 2 + r.life * 3;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, r.r, 0, 6.283);
+      ctx.stroke();
+    }
+    for (const p of fx) {
+      const tw = 0.7 + 0.3 * Math.sin(now * 0.02 + p.tw);
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 8 * tw;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * (0.4 + p.life), 0, 6.283);
+      ctx.fill();
+    }
+    for (const c of confetti) {
+      ctx.globalAlpha = Math.max(0, c.life);
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.rotate(c.rot);
+      const sq = Math.abs(Math.sin(now * 0.004 + c.rot));
+      ctx.fillStyle = c.color;
+      ctx.fillRect(-c.w / 2, -c.h / 2, c.w, c.h * (0.3 + 0.7 * sq));
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+
     // ======== 中心名字超强高亮渲染 ========
     if (centerWinners.length > 0) {
       const w = centerWinners[0];
@@ -1402,6 +1530,24 @@ if (isJoinMode) {
       spotlight.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = spotlight;
       ctx.fillRect(0, 0, W, H);
+
+      const beamN = 12, beamRot = now * 0.0007;
+      for (let i = 0; i < beamN; i++) {
+        const a = beamRot + i / beamN * 6.283;
+        const len = 320 + 130 * Math.sin(now * 0.003 + i);
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(a);
+        const lg = ctx.createLinearGradient(0, 0, len, 0);
+        const hue = (now * 0.05 + i * 30) % 360;
+        lg.addColorStop(0, 'hsla(' + hue + ', 100%, 66%, 0.32)');
+        lg.addColorStop(1, 'hsla(' + hue + ', 100%, 60%, 0)');
+        ctx.fillStyle = lg;
+        ctx.beginPath();
+        ctx.moveTo(0, -7); ctx.lineTo(len, -2); ctx.lineTo(len, 2); ctx.lineTo(0, 7);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
 
       let scale = 1;
       if (age < 0.3) {
@@ -1423,8 +1569,14 @@ if (isJoinMode) {
       ctx.fillStyle = '#fff';
       ctx.fillText(w.name, 0, 0);
       
+      ctx.lineWidth = 9;
+      ctx.strokeStyle = 'hsla(' + ((now * 0.18) % 360) + ', 100%, 60%, 0.85)';
+      ctx.shadowColor = 'hsl(' + ((now * 0.18) % 360) + ', 100%, 60%)';
+      ctx.shadowBlur = 34;
+      ctx.strokeText(w.name, 0, 0);
       ctx.lineWidth = 6;
       ctx.strokeStyle = '#ffd700';
+      ctx.shadowBlur = 0;
       ctx.strokeText(w.name, 0, 0);
       
       const grad = ctx.createLinearGradient(0, -70, 0, 70);
@@ -1437,6 +1589,14 @@ if (isJoinMode) {
       ctx.shadowBlur = 40;
       ctx.shadowColor = '#ffd700';
       ctx.fillText(w.name, 0, 0);
+
+      const ring = 0.5 + 0.5 * Math.sin(now * 0.004);
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'hsla(' + ((now * 0.12) % 360) + ', 100%, 62%, ' + (0.5 + 0.4 * ring).toFixed(3) + ')';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, 155 + ring * 28, 0, 6.283);
+      ctx.stroke();
       
       ctx.restore();
     }
@@ -1615,10 +1775,10 @@ if (isJoinMode) {
     picked.forEach((p, i) => {
       p.won = true;
       prize.drawn++;
-      winners.push({ name: p.disp || p.name, prize: prize.name, uid: p.uid });
     });
     saveData();
-    renderUI();
+    renderPrizeList();
+    renderSyncStat();
 
     const now = performance.now();
     
@@ -1634,6 +1794,7 @@ if (isJoinMode) {
         duration: 1800 + secureRandInt(1200),                        // 飞行时长随机，节奏不重复
         arrived: false,
         pos: null,
+        rec: { name: p.disp || p.name, prize: prize.name, uid: p.uid },
         trail: []
       });
     });
@@ -1894,82 +2055,6 @@ if (isJoinMode) {
   renderUI();
   requestAnimationFrame(frame);
 }
-/* ================= 全屏显示支持 ================= */
-(function () {
-  var fsBtn = document.getElementById('fullscreenBtn');
-  if (!fsBtn) return;
-
-  var ICON_ENTER = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9V3h6"/><path d="M21 9V3h-6"/><path d="M3 15v6h6"/><path d="M21 15v6h-6"/></svg>';
-  var ICON_EXIT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v6H3"/><path d="M15 3v6h6"/><path d="M9 21v-6H3"/><path d="M15 21v-6h6"/></svg>';
-
-  function tip(msg) {
-    if (typeof showTip === 'function') showTip(msg);
-  }
-  function fsEl() {
-    return document.fullscreenElement || document.webkitFullscreenElement || null;
-  }
-  function canFs() {
-    var el = document.documentElement;
-    return !!(el.requestFullscreen || el.webkitRequestFullscreen);
-  }
-  function applyUI() {
-    var on = !!fsEl();
-    fsBtn.innerHTML = on ? ICON_EXIT + '<span>退出全屏</span>'
-                         : ICON_ENTER + '<span>全屏</span>';
-    fsBtn.title = on ? '退出全屏显示（也可直接按 Esc）'
-                     : '全屏显示大屏（快捷键 F）';
-  }
-  function enterFs() {
-    var el = document.documentElement;
-    var p = el.requestFullscreen ? el.requestFullscreen()
-          : (el.webkitRequestFullscreen ? el.webkitRequestFullscreen() : null);
-    if (p && typeof p.then === 'function') {
-      p.catch(function () { tip('进入全屏失败，请确认浏览器允许全屏'); });
-    }
-  }
-  function exitFs() {
-    if (document.exitFullscreen) document.exitFullscreen();
-    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-  }
-  function toggleFs() {
-    if (!canFs()) {
-      tip('当前浏览器不支持全屏，可改用 Chrome / Edge / Firefox，或按 F11 最大化');
-      return;
-    }
-    if (fsEl()) exitFs();
-    else enterFs();
-  }
-
-  fsBtn.addEventListener('click', toggleFs);
-
-  ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) {
-    document.addEventListener(ev, function () {
-      applyUI();
-      // 全屏切换会改变视口尺寸，通知动画层重新适配画布
-      setTimeout(function () {
-        try { window.dispatchEvent(new Event('resize')); } catch (e) {}
-      }, 80);
-      setTimeout(function () {
-        try { window.dispatchEvent(new Event('resize')); } catch (e) {}
-      }, 420);
-    });
-  });
-  ['fullscreenerror', 'webkitfullscreenerror'].forEach(function (ev) {
-    document.addEventListener(ev, function () { tip('全屏请求被浏览器拒绝'); });
-  });
-
-  // 快捷键 F：仅在非输入状态且无修饰键时切换，避免与姓名/名单输入冲突
-  document.addEventListener('keydown', function (e) {
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    var t = e.target;
-    var tag = (t && t.tagName ? t.tagName : '').toLowerCase();
-    if (tag === 'input' || tag === 'textarea' || tag === 'select' || (t && t.isContentEditable)) return;
-    if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFs(); }
-  });
-
-  applyUI();
-})();
-
 </script>
 </body>
 </html>
