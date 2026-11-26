@@ -28,7 +28,6 @@ background:rgba(8,20,40,.92);border:1px solid rgba(0,242,254,.5);color:#eaf4ff;
 padding:10px 22px;border-radius:24px;font-size:15px;opacity:0;pointer-events:none;
 transition:opacity .25s;box-shadow:0 6px 24px rgba(0,0,0,.5)}
 #tipToast.show{opacity:1}
-#bgmBtn{height:36px;width:36px;border-radius:50%;border:1px solid rgba(0,242,254,.5);background:rgba(0,242,254,.1);color:#00f2fe;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 
 main{flex:1;display:flex;min-height:0}
 .left{width:280px;background:linear-gradient(180deg, rgba(8,20,40,.8), rgba(3,6,16,.9));padding:15px;border-right:1px solid rgba(90,170,255,.2);overflow-y:auto;backdrop-filter:blur(5px)}
@@ -36,6 +35,16 @@ main{flex:1;display:flex;min-height:0}
 .left, .right { -ms-overflow-style: none; scrollbar-width: none; }
 
 .left h3{margin-bottom:15px;font-size:16px;text-align:center;color:#00f2fe;letter-spacing:2px;text-shadow:0 0 10px rgba(0,242,254,.5)}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:15px}
+.panel-head h3{flex:1;margin-bottom:0}
+.btn-export{flex:none;display:inline-flex;align-items:center;gap:4px;height:30px;padding:0 12px;border-radius:8px;font-size:12px;font-weight:bold;letter-spacing:1px;color:#00f2fe;background:rgba(0,242,254,.12);border:1px solid rgba(0,242,254,.4);cursor:pointer;transition:.2s}
+.btn-export:hover{background:rgba(0,242,254,.26);color:#eafcff;border-color:#00f2fe;box-shadow:0 0 12px rgba(0,242,254,.4)}
+.btn-export:active{transform:scale(.96)}
+.btn-export:disabled{opacity:.4;cursor:not-allowed;background:rgba(120,150,180,.1);border-color:rgba(120,150,180,.25);color:#7f9bb5;box-shadow:none}
+#winnerList{max-height:calc(100vh - 130px);overflow-y:auto;overflow-x:hidden;padding-right:2px}
+#winnerList::-webkit-scrollbar{width:6px;display:block}
+#winnerList::-webkit-scrollbar-thumb{background:rgba(0,242,254,.4);border-radius:3px}
+#winnerList::-webkit-scrollbar-track{background:transparent}
 .winner-item{background:linear-gradient(90deg,rgba(0,242,254,.15),rgba(10,20,40,.4));padding:10px;margin-bottom:8px;border-radius:6px;border-left:3px solid #00f2fe;display:flex;justify-content:space-between;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.3);animation: slideIn 0.3s ease-out;}
 @keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 .winner-item span{color:#8fb8e0}
@@ -146,15 +155,12 @@ canvas{display:block;width:100%;height:100%}
 </head>
 <body>
 
-<!-- 背景音乐：Web Audio API 合成，无需外部文件 -->
-
 <!-- 大屏界面 -->
 <div id="screen">
   <header>
     <div class="brand">LUCKY DRAW</div>
     <div class="header-right">
       <div class="count">已参与 <span id="totalCount">0</span> 人<span id="syncStat" class="sync-stat">同步初始化…</span></div>
-      <button id="bgmBtn" title="背景音乐">🔊</button>
       <button id="showQrBtn">📱 扫码参与</button>
       <button id="rosterBtn">名单管理</button>
       <button id="settingBtn">⚙️ 设置奖项</button>
@@ -162,7 +168,10 @@ canvas{display:block;width:100%;height:100%}
   </header>
   <main>
     <div class="left">
-      <h3>🏆 中奖名单</h3>
+      <div class="panel-head">
+        <h3>🏆 中奖名单</h3>
+        <button id="exportWinnersBtn" class="btn-export" type="button" title="导出中奖人员名单（CSV，可用 Excel / WPS 打开）"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg> 导出</button>
+      </div>
       <div id="winnerList"></div>
     </div>
     <div class="canvas-box">
@@ -920,7 +929,6 @@ if (isJoinMode) {
   const autoName = String(urlParams.get('name') || '').trim();
   if (autoName) { $('m_name').value = autoName; setTimeout(() => submitName(autoName), 700); }
 
-
   flushQueue();                              // 进入页面先补发上次未成功的登记
   setInterval(flushQueue, 9000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) flushQueue(); });
@@ -929,126 +937,6 @@ if (isJoinMode) {
   // ======== 大屏端逻辑 ========
   loadData();
   initComm();
-
-  // ======== Web Audio API 合成氛围音效（不依赖任何外部文件）========
-  let audioCtx = null, bgmGain = null, bgmNodes = [], isBgmPlaying = false;
-  let drumInterval = null, isDrumming = false;
-
-  function initAudio() {
-    if (audioCtx) return;
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    bgmGain = audioCtx.createGain();
-    bgmGain.gain.value = 0;
-    bgmGain.connect(audioCtx.destination);
-  }
-
-  function startAmbient() {
-    initAudio();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    stopAmbient();
-    // 低频氛围 pad：多层正弦波 + 缓慢 LFO
-    var freqs = [55, 110, 165, 220, 330];
-    freqs.forEach(function(f, idx) {
-      var osc = audioCtx.createOscillator();
-      osc.type = idx < 2 ? 'sine' : 'triangle';
-      osc.frequency.value = f;
-      var g = audioCtx.createGain();
-      g.gain.value = 0.04 / (idx + 1);
-      var lfo = audioCtx.createOscillator();
-      lfo.frequency.value = 0.1 + idx * 0.07;
-      var lfoGain = audioCtx.createGain();
-      lfoGain.gain.value = 0.015 / (idx + 1);
-      lfo.connect(lfoGain);
-      lfoGain.connect(g.gain);
-      lfo.start();
-      osc.connect(g);
-      g.connect(bgmGain);
-      osc.start();
-      bgmNodes.push(osc, lfo);
-    });
-    // 高频 sparkle 层：极轻的噪声 + 带通滤波
-    var bufSize = audioCtx.sampleRate * 2;
-    var noiseBuf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
-    var data = noiseBuf.getChannelData(0);
-    for (var i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
-    var noise = audioCtx.createBufferSource();
-    noise.buffer = noiseBuf;
-    noise.loop = true;
-    var bp = audioCtx.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.value = 3000;
-    bp.Q.value = 5;
-    var ng = audioCtx.createGain();
-    ng.gain.value = 0.008;
-    noise.connect(bp);
-    bp.connect(ng);
-    ng.connect(bgmGain);
-    noise.start();
-    bgmNodes.push(noise);
-    bgmGain.gain.setTargetAtTime(0.25, audioCtx.currentTime, 1.5);
-  }
-
-  function stopAmbient() {
-    bgmNodes.forEach(function(n) { try { n.stop(); } catch(e){} });
-    bgmNodes = [];
-    if (bgmGain) bgmGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.5);
-  }
-
-  // 抽奖旋转时的紧张鼓点
-  function startDrums() {
-    if (isDrumming) return;
-    isDrumming = true;
-    initAudio();
-    drumInterval = setInterval(function() {
-      if (!audioCtx || audioCtx.state === 'suspended') return;
-      var osc = audioCtx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.12);
-      var g = audioCtx.createGain();
-      g.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-      osc.connect(g); g.connect(audioCtx.destination);
-      osc.start(); osc.stop(audioCtx.currentTime + 0.15);
-    }, 180);
-  }
-  function stopDrums() {
-    isDrumming = false;
-    if (drumInterval) { clearInterval(drumInterval); drumInterval = null; }
-  }
-
-  // 中奖音效：上行琶音 + 铃声
-  function playWinSound() {
-    initAudio();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    var notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
-    notes.forEach(function(freq, i) {
-      var osc = audioCtx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      var g = audioCtx.createGain();
-      var t0 = audioCtx.currentTime + i * 0.1;
-      g.gain.setValueAtTime(0.25, t0);
-      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.8);
-      osc.connect(g); g.connect(audioCtx.destination);
-      osc.start(t0); osc.stop(t0 + 0.8);
-      var osc2 = audioCtx.createOscillator();
-      osc2.type = 'triangle';
-      osc2.frequency.value = freq * 2;
-      var g2 = audioCtx.createGain();
-      g2.gain.setValueAtTime(0.08, t0);
-      g2.gain.exponentialRampToValueAtTime(0.001, t0 + 1.2);
-      osc2.connect(g2); g2.connect(audioCtx.destination);
-      osc2.start(t0); osc2.stop(t0 + 1.2);
-    });
-  }
-
-  $('bgmBtn').onclick = function() {
-    initAudio();
-    if (isBgmPlaying) { stopAmbient(); $('bgmBtn').textContent = '🔇'; }
-    else { startAmbient(); $('bgmBtn').textContent = '🔊'; }
-    isBgmPlaying = !isBgmPlaying;
-  };
 
   function buildJoinUrl() {
     const path = location.href.split('?')[0].split('#')[0];
@@ -1335,8 +1223,6 @@ if (isJoinMode) {
         centerWinners.push({ name: f.name, born: now, expire: now + 3000 });
         createSparks(cx, cy, '#00f2fe'); 
         createSparks(cx, cy, '#ffd700');
-        stopDrums();
-        playWinSound();
       }
     }
     flyers = flyers.filter(f => !f.arrived);
@@ -1512,8 +1398,6 @@ if (isJoinMode) {
       ctx.fillStyle = spotlight;
       ctx.fillRect(0, 0, W, H);
 
-
-
       let scale = 1;
       if (age < 0.3) {
         scale = 0.5 + (age / 0.3) * 0.6;
@@ -1602,7 +1486,51 @@ if (isJoinMode) {
     $('winnerList').innerHTML = [...winners].reverse().map(w => 
       `<div class="winner-item"><span>${w.prize}</span><b>${w.name}</b></div>`
     ).join('') || '<div style="color:#6f8fb0;text-align:center;font-size:12px;margin-top:20px">暂无中奖记录</div>';
+    if (typeof refreshExportBtn === 'function') refreshExportBtn();
   }
+
+  // 中奖名单导出（纯前端生成 CSV，零依赖，带 BOM 防中文乱码）
+  function refreshExportBtn() {
+    const btn = $('exportWinnersBtn');
+    if (btn) btn.disabled = winners.length === 0;
+  }
+  function buildWinnerRows() {
+    const byUid = {};
+    (typeof participants !== 'undefined' && participants && participants.forEach) &&
+      participants.forEach(p => { byUid[p.uid] = p; });
+    return [...winners].reverse().map((w, i) => {
+      const p = byUid[w.uid] || {};
+      let tStr = '';
+      if (p.t) {
+        const d = new Date(p.t);
+        const pad = n => String(n).padStart(2, '0');
+        tStr = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) +
+               ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+      }
+      return { seq: i + 1, name: w.name || '', prize: w.prize || '', regTime: tStr, uid: w.uid || '' };
+    });
+  }
+  function exportWinnersCsv() {
+    if (!winners.length) { showTip('暂无中奖记录，无法导出'); return; }
+    const rows = buildWinnerRows();
+    const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const head = ['序号', '姓名', '奖项', '登记时间', '编号'];
+    const body = rows.map(r => [r.seq, r.name, r.prize, r.regTime, r.uid]);
+    const csv = [head].concat(body).map(r => r.map(esc).join(',')).join('\r\n');
+    const pad = n => String(n).padStart(2, '0'), now = new Date();
+    const fname = '中奖名单_' + now.getFullYear() + pad(now.getMonth()+1) + pad(now.getDate()) +
+                  '_' + pad(now.getHours()) + pad(now.getMinutes()) + '.csv';
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    showTip('已导出 ' + rows.length + ' 条中奖记录');
+  }
+  const _ewb = $('exportWinnersBtn');
+  if (_ewb) _ewb.onclick = exportWinnersCsv;
+  refreshExportBtn();
 
   // --- 抽奖控制 ---
   $('startBtn').onclick = () => {
@@ -1631,11 +1559,8 @@ if (isJoinMode) {
       return;
     }
 
-    if (!isBgmPlaying) { startAmbient(); isBgmPlaying = true; $('bgmBtn').textContent = '🔊'; }
-    
     state = 'spinning';
     targetSpeed = 3.5;
-    startDrums();
     $('startBtn').disabled = true;
     $('stopBtn').disabled = false;
     centerWinners = []; 
