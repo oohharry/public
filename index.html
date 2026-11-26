@@ -23,6 +23,10 @@ header{height:70px;display:flex;align-items:center;justify-content:space-between
 #settingBtn:hover{background:rgba(0,242,254,.2)}
 #rosterBtn{height:36px;padding:0 14px;white-space:nowrap;border:1px solid rgba(0,242,254,.5);border-radius:8px;background:rgba(0,242,254,.1);color:#00f2fe;font-size:14px;cursor:pointer;transition:.2s}
 #rosterBtn:hover{background:rgba(0,242,254,.2)}
+#fullscreenBtn{height:36px;padding:0 14px;white-space:nowrap;border:1px solid rgba(0,242,254,.5);border-radius:8px;background:rgba(0,242,254,.1);color:#00f2fe;font-size:14px;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:6px;flex:none}
+#fullscreenBtn:hover{background:rgba(0,242,254,.2);box-shadow:0 0 12px rgba(0,242,254,.35)}
+#fullscreenBtn:active{transform:scale(0.95)}
+#fullscreenBtn svg{flex:none}
 #tipToast{position:fixed;top:84px;left:50%;transform:translateX(-50%);z-index:300;
 background:rgba(8,20,40,.92);border:1px solid rgba(0,242,254,.5);color:#eaf4ff;
 padding:10px 22px;border-radius:24px;font-size:15px;opacity:0;pointer-events:none;
@@ -158,12 +162,13 @@ canvas{display:block;width:100%;height:100%}
 <!-- 大屏界面 -->
 <div id="screen">
   <header>
-    <div class="brand">苏州安美科技有限公司</div>
+    <div class="brand">LUCKY DRAW</div>
     <div class="header-right">
       <div class="count">已参与 <span id="totalCount">0</span> 人<span id="syncStat" class="sync-stat">同步初始化…</span></div>
       <button id="showQrBtn">📱 扫码参与</button>
       <button id="rosterBtn">名单管理</button>
       <button id="settingBtn">⚙️ 设置奖项</button>
+      <button id="fullscreenBtn" type="button" title="全屏显示大屏（快捷键 F）"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9V3h6"/><path d="M21 9V3h-6"/><path d="M3 15v6h6"/><path d="M21 15v6h-6"/></svg><span>全屏</span></button>
     </div>
   </header>
   <main>
@@ -1889,6 +1894,82 @@ if (isJoinMode) {
   renderUI();
   requestAnimationFrame(frame);
 }
+/* ================= 全屏显示支持 ================= */
+(function () {
+  var fsBtn = document.getElementById('fullscreenBtn');
+  if (!fsBtn) return;
+
+  var ICON_ENTER = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9V3h6"/><path d="M21 9V3h-6"/><path d="M3 15v6h6"/><path d="M21 15v6h-6"/></svg>';
+  var ICON_EXIT = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v6H3"/><path d="M15 3v6h6"/><path d="M9 21v-6H3"/><path d="M15 21v-6h6"/></svg>';
+
+  function tip(msg) {
+    if (typeof showTip === 'function') showTip(msg);
+  }
+  function fsEl() {
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+  }
+  function canFs() {
+    var el = document.documentElement;
+    return !!(el.requestFullscreen || el.webkitRequestFullscreen);
+  }
+  function applyUI() {
+    var on = !!fsEl();
+    fsBtn.innerHTML = on ? ICON_EXIT + '<span>退出全屏</span>'
+                         : ICON_ENTER + '<span>全屏</span>';
+    fsBtn.title = on ? '退出全屏显示（也可直接按 Esc）'
+                     : '全屏显示大屏（快捷键 F）';
+  }
+  function enterFs() {
+    var el = document.documentElement;
+    var p = el.requestFullscreen ? el.requestFullscreen()
+          : (el.webkitRequestFullscreen ? el.webkitRequestFullscreen() : null);
+    if (p && typeof p.then === 'function') {
+      p.catch(function () { tip('进入全屏失败，请确认浏览器允许全屏'); });
+    }
+  }
+  function exitFs() {
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+  }
+  function toggleFs() {
+    if (!canFs()) {
+      tip('当前浏览器不支持全屏，可改用 Chrome / Edge / Firefox，或按 F11 最大化');
+      return;
+    }
+    if (fsEl()) exitFs();
+    else enterFs();
+  }
+
+  fsBtn.addEventListener('click', toggleFs);
+
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) {
+    document.addEventListener(ev, function () {
+      applyUI();
+      // 全屏切换会改变视口尺寸，通知动画层重新适配画布
+      setTimeout(function () {
+        try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+      }, 80);
+      setTimeout(function () {
+        try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+      }, 420);
+    });
+  });
+  ['fullscreenerror', 'webkitfullscreenerror'].forEach(function (ev) {
+    document.addEventListener(ev, function () { tip('全屏请求被浏览器拒绝'); });
+  });
+
+  // 快捷键 F：仅在非输入状态且无修饰键时切换，避免与姓名/名单输入冲突
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    var t = e.target;
+    var tag = (t && t.tagName ? t.tagName : '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || (t && t.isContentEditable)) return;
+    if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFs(); }
+  });
+
+  applyUI();
+})();
+
 </script>
 </body>
 </html>
