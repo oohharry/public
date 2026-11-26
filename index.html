@@ -894,7 +894,7 @@ if (isJoinMode) {
       bx: Math.cos(phi) * r, by: u, bz: Math.sin(phi) * r,
       name: null, owner: null,
       seed: Math.random(),
-      sx: 0, sy: 0, sz: 0, persp: 1
+      sx: 0, sy: 0, sz: 0, persp: 1, prevSx: 0, prevSy: 0
     };
   }
   function ensureSlotCapacity() {
@@ -1023,49 +1023,69 @@ if (isJoinMode) {
   }
   window.addEventListener('resize', resize);
 
-  // ===== 球体轨道线：与点云共用同一旋转 + 透视，随球体一起转动，提升观感 =====
-  const ORBITS = [
-    { tilt: 0.04,  scale: 1.12, base: 0.30, wid: 1.2 },   // 近赤道环
-    { tilt: 0.66,  scale: 1.05, base: 0.22, wid: 1.0 },   // 斜环一
-    { tilt: -0.72, scale: 1.18, base: 0.18, wid: 1.0 }    // 斜环二
-  ];
-  function orbitPoint(o, ang, cosY, sinY, cosX, sinX) {
-    const bx = Math.cos(ang) * o.scale;
-    const by = Math.sin(ang) * o.scale * Math.sin(o.tilt);
-    const bz = Math.sin(ang) * o.scale * Math.cos(o.tilt);
-    let x = bx * cosY - bz * sinY;
-    let z = bx * sinY + bz * cosY;
-    let y = by * cosX - z * sinX;
-    z = by * sinX + z * cosX;
-    const persp = 2.4 / (2.4 + z);
-    return { x: cx + x * R * persp, y: cy + y * R * persp, z: z, persp: persp };
-  }
-  function drawOrbits(front, now) {
-    const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
-    const cosX = Math.cos(-0.18), sinX = Math.sin(-0.18);
-    const SEG = 116;
-    ctx.lineCap = 'round';
-    for (const o of ORBITS) {
-      let prev = orbitPoint(o, 0, cosY, sinY, cosX, sinX);
-      for (let i = 1; i <= SEG; i++) {
-        const ang = (i / SEG) * Math.PI * 2;
-        const p = orbitPoint(o, ang, cosY, sinY, cosX, sinX);
-        const z = (prev.z + p.z) / 2;
-        if ((z >= 0) === front) {
-          const depth = Math.max(0, Math.min(1, (z + 1.2) / 2.4));
-          const pulse = 0.82 + 0.18 * Math.sin(now * 0.0015 + ang * 3 + o.tilt * 4);
-          const al = o.base * (0.14 + depth * 1.0) * pulse;
-          ctx.beginPath();
-          ctx.moveTo(prev.x, prev.y);
-          ctx.lineTo(p.x, p.y);
-          ctx.strokeStyle = 'rgba(' + ORBIT_RGB + ',' + al.toFixed(3) + ')';
-          ctx.lineWidth = o.wid * (0.5 + depth * 0.9);
-          ctx.stroke();
-        }
-        prev = p;
+  // ===== 球体氛围辉光（取代线条轨道） =====
+  function drawSphereGlow(now, front) {
+    const breathe = 0.85 + 0.15 * Math.sin(now * 0.0008);
+    if (!front) {
+      const glow = ctx.createRadialGradient(cx, cy, R * 0.15, cx, cy, R * 1.4);
+      glow.addColorStop(0, 'rgba(0, 180, 254, ' + (0.03 * breathe).toFixed(4) + ')');
+      glow.addColorStop(0.5, 'rgba(0, 120, 254, ' + (0.05 * breathe).toFixed(4) + ')');
+      glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, R * 1.06, 0, Math.PI * 2);
+      ctx.arc(cx, cy, R * 0.93, 0, Math.PI * 2, true);
+      ctx.closePath();
+      const rim = ctx.createRadialGradient(cx, cy, R * 0.9, cx, cy, R * 1.08);
+      rim.addColorStop(0, 'rgba(0, 242, 254, 0)');
+      rim.addColorStop(0.6, 'rgba(0, 200, 254, ' + (0.08 * breathe).toFixed(4) + ')');
+      rim.addColorStop(1, 'rgba(120, 230, 255, ' + (0.15 * breathe).toFixed(4) + ')');
+      ctx.fillStyle = rim;
+      ctx.fill();
+      ctx.restore();
+      const axG = 0.1 + 0.05 * Math.sin(now * 0.001);
+      const tiltX = -0.18;
+      for (const yy of [cy - R * 1.12 * Math.cos(tiltX), cy + R * 1.12 * Math.cos(tiltX)]) {
+        const g = ctx.createRadialGradient(cx, yy, 0, cx, yy, R * 0.13);
+        g.addColorStop(0, 'rgba(0, 242, 254, ' + (axG * 2).toFixed(4) + ')');
+        g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, yy, R * 0.13, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
-    ctx.lineCap = 'butt';
+  }
+
+  // ===== 运动拖尾绘制 =====
+  function drawMotionTrail(sx, sy, prevSx, prevSy, alpha, size, isText, name) {
+    if (prevSx === 0 && prevSy === 0) return;
+    const dx = sx - prevSx;
+    const dy = sy - prevSy;
+    const spd = Math.sqrt(dx * dx + dy * dy);
+    if (spd < 0.4) return;
+    const steps = Math.min(5, Math.ceil(spd / 2.5));
+    for (let i = 1; i <= steps; i++) {
+      const frac = i / (steps + 1);
+      const tx = sx - dx * (1 - frac) * 2.8;
+      const ty = sy - dy * (1 - frac) * 2.8;
+      const ta = alpha * (1 - frac) * 0.35;
+      if (ta < 0.01) continue;
+      if (isText && name) {
+        ctx.fillStyle = 'rgba(' + NAME_RGB + ', ' + ta.toFixed(3) + ')';
+        ctx.fillText(name, tx, ty);
+      } else {
+        ctx.beginPath();
+        ctx.arc(tx, ty, size * (1 - frac * 0.4), 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + DOT_RGB + ', ' + ta.toFixed(3) + ')';
+        ctx.fill();
+      }
+    }
   }
 
   function createSparks(x, y, color = '#00f2fe') {
@@ -1149,9 +1169,10 @@ if (isJoinMode) {
     ctx.fillRect(0, 0, W, H);
     
     bgStars.forEach(s => {
-      ctx.fillStyle = `rgba(0, 242, 254, ${s.a})`;
+      const tw = 0.6 + 0.4 * Math.sin(now * 0.001 + s.a * 12);
+      ctx.fillStyle = `rgba(160, 225, 255, ${(s.a * tw).toFixed(3)})`;
       ctx.beginPath();
-      ctx.arc(s.x, s.y, s.s, 0, Math.PI*2);
+      ctx.arc(s.x, s.y, s.s * (0.8 + tw * 0.3), 0, Math.PI*2);
       ctx.fill();
     });
 
@@ -1170,7 +1191,7 @@ if (isJoinMode) {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
-    drawOrbits(false, now);      // 球体背侧轨道线（垫在点云后面）
+    drawSphereGlow(now, false);  // 球体背侧氛围光
     const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
     const cosX = Math.cos(-0.18), sinX = Math.sin(-0.18);
     const arr = [];
@@ -1188,12 +1209,14 @@ if (isJoinMode) {
       
       const persp = 2.4 / (2.4 + z);
 
+      s.prevSx = s.sx;
+      s.prevSy = s.sy;
       s.sx = cx + x * R * persp;
       s.sy = cy + y * R * persp;
       s.sz = z;
       s.persp = persp;
 
-      arr.push({ x: s.sx, y: s.sy, z: z, persp: persp, name: s.name, seed: s.seed });
+      arr.push({ x: s.sx, y: s.sy, z: z, persp: persp, name: s.name, seed: s.seed, prevSx: s.prevSx, prevSy: s.prevSy });
     }
     
     arr.sort((a, b) => a.z - b.z);
@@ -1202,33 +1225,40 @@ if (isJoinMode) {
 
     for (const a of arr) {
       if (a.name) {
-        // 原色彩设定：统一青白人名，靠景深调亮度，不使用多色高亮
         const depth = (a.z + 1) / 2;
-        const alpha = 0.15 + depth * 0.85;
+        const alpha = 0.2 + depth * 0.8;
         const size = 10 + a.persp * 9;
         ctx.font = `bold ${size.toFixed(1)}px "Microsoft YaHei"`;
+        drawMotionTrail(a.x, a.y, a.prevSx, a.prevSy, alpha * 0.5, size, true, a.name);
         ctx.shadowColor = NAME_GLOW;
-        ctx.shadowBlur = a.persp * 10;
+        ctx.shadowBlur = a.persp * 14;
         ctx.fillStyle = `rgba(${NAME_RGB}, ${alpha.toFixed(3)})`;
+        ctx.fillText(a.name, a.x, a.y);
+        ctx.shadowBlur = a.persp * 5;
+        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.12).toFixed(3)})`;
         ctx.fillText(a.name, a.x, a.y);
         ctx.shadowBlur = 0;
       } else {
-        // 未分配的槽位 = 球面上的光点（默认满屏光点，构成完整球体）
         const depth = (a.z + 1) / 2;
-        const tw = 0.7 + 0.3 * Math.sin(now * 0.0022 + a.seed * 6.283);
-        const rad = (1.1 + depth * 1.9) * a.persp;
-        const dotA = (0.16 + depth * 0.66) * tw;
+        const tw = 0.65 + 0.35 * Math.sin(now * 0.0022 + a.seed * 6.283);
+        const rad = (1.2 + depth * 2.0) * a.persp;
+        const dotA = (0.2 + depth * 0.6) * tw;
+        drawMotionTrail(a.x, a.y, a.prevSx, a.prevSy, dotA * 0.3, rad, false, null);
         ctx.beginPath();
         ctx.arc(a.x, a.y, rad, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${DOT_RGB}, ${dotA.toFixed(3)})`;
         ctx.shadowColor = 'rgba(0, 242, 254, 0.9)';
-        ctx.shadowBlur = depth * 9;
+        ctx.shadowBlur = depth * 12;
         ctx.fill();
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, rad * 0.35, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${(dotA * 0.5).toFixed(3)})`;
         ctx.shadowBlur = 0;
+        ctx.fill();
       }
     }
 
-    drawOrbits(true, now);       // 球体前侧轨道线（压在点云上面，形成环绕感）
+    drawSphereGlow(now, true);   // 球体前侧边缘辉光
 
     // 彗星轨迹
     for (const f of flyers) {
