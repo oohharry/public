@@ -296,7 +296,8 @@ function showTip(msg) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // ======== 文字配色：恢复原设定（名字统一青白、光点统一青蓝），不再使用多色高亮 ========
 const NAME_RGB = '220, 240, 255';   // 人名填充（透明度由景深决定）
-const NAME_GLOW = 'rgba(0, 242, 254, 0.8)';
+const NAME_GLOW = 'rgba(120, 210, 255, 0.55)';  // 淡蓝光影（阴影色）
+const TECH_STROKE = 'rgba(100, 220, 255, 0.12)'; // 科技感描边
 const DOT_RGB = '150, 240, 255';    // 未登记槽位的光点
 const ORBIT_RGB = '0, 242, 254';    // 球体轨道线
 
@@ -1106,7 +1107,7 @@ if (isJoinMode) {
   }
 
   function resize() {
-    dpr = window.devicePixelRatio || 1;
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5);   // 高分屏封顶到 1.5，像素量大幅下降
     W = canvas.clientWidth;
     H = canvas.clientHeight;
     canvas.width = W * dpr;
@@ -1176,6 +1177,27 @@ if (isJoinMode) {
       } else {
         ctx.beginPath();
         ctx.arc(tx, ty, size * (1 - frac * 0.4), 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + DOT_RGB + ', ' + ta.toFixed(3) + ')';
+        ctx.fill();
+      }
+    }
+  }
+
+  // ===== 历史帧拖影：淡淡彗星尾迹（越旧越淡，帧数随人数递减） =====
+  function drawHistoryTrail(hist, alpha, size, isText, name) {
+    if (!hist || hist.length < 2) return;
+    const n = hist.length;
+    for (let i = 0; i < n - 1; i++) {
+      const frac = i / n;
+      const ta = alpha * frac * 0.55;
+      if (ta < 0.012) continue;
+      const p = hist[i];
+      if (isText && name) {
+        ctx.fillStyle = 'rgba(' + NAME_RGB + ', ' + ta.toFixed(3) + ')';
+        ctx.fillText(name, p.x, p.y);
+      } else {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, size * (0.5 + frac * 0.45), 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(' + DOT_RGB + ', ' + ta.toFixed(3) + ')';
         ctx.fill();
       }
@@ -1376,6 +1398,11 @@ if (isJoinMode) {
     ensureSlotCapacity();
     const pool = participants.filter(p => !p.won);
     assignNamesToSlots(pool);   // 无人登记 → 全部是光点；有人登记 → 光点逐个替换成人名
+
+    // ===== 分层渲染阈值：按景深 z 分三档，兼顾特效观感与帧率 =====
+    const FRONT_MIN = 0, MID_MIN = -0.15;           // 前半球 / 中半球 / 后半球
+    const TRAIL_FRAMES = pool.length > 350 ? 2 : 3; // 人多时拖影帧数减半
+    const TRAIL_ALPHA = 0.3;
     
     for (let i = 0; i < MAX; i++) {
       const s = slots[i];
@@ -1393,14 +1420,17 @@ if (isJoinMode) {
       s.sz = z;
       s.persp = persp;
 
-      arr.push({ x: s.sx, y: s.sy, z: z, persp: persp, name: s.name, seed: s.seed, prevSx: s.prevSx, prevSy: s.prevSy });
+      if (!s.hist) s.hist = [];
+      s.hist.push({ x: s.sx, y: s.sy });
+      while (s.hist.length > TRAIL_FRAMES + 1) s.hist.shift();
+
+      arr.push({ x: s.sx, y: s.sy, z: z, persp: persp, name: s.name, seed: s.seed, prevSx: s.prevSx, prevSy: s.prevSy, hist: s.hist });
     }
     
     arr.sort((a, b) => a.z - b.z);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const perfMode = pool.length > 200;          // 人多时优先流畅：关文字阴影/拖尾
-    const dotPerf = MAX > 300;
+    const dotPerf = MAX > 300;                   // 槽位很多时关光点阴影
     const showDots = true;                       // 光点常驻：人少铺满、人多逐减
     // 光点随人数主动递减：绑定人数越多，保留显示的空槽光点越少，避免堆积卡顿
     const boundCnt = MAX - freeDotCount(arr);
@@ -1417,32 +1447,43 @@ if (isJoinMode) {
         const alpha = 0.2 + depth * 0.8;
         const size = 10 + a.persp * 9;
         ctx.font = `bold ${size.toFixed(1)}px "Microsoft YaHei"`;
-        if (!perfMode) drawMotionTrail(a.x, a.y, a.prevSx, a.prevSy, alpha * 0.5, size, true, a.name);
-        if (perfMode) {
-          ctx.shadowBlur = 0;
-          ctx.fillStyle = `rgba(${NAME_RGB}, ${alpha.toFixed(3)})`;
-          ctx.fillText(a.name, a.x, a.y);
-        } else {
+        if (a.z > FRONT_MIN) {
+          // 前半球：淡淡彗星拖影 + 淡蓝光影 + 科技感描边 + 发光主体
+          drawHistoryTrail(a.hist, alpha * TRAIL_ALPHA, size, true, a.name);
           ctx.shadowColor = NAME_GLOW;
-          ctx.shadowBlur = a.persp * 14;
+          ctx.shadowBlur = 10;
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = TECH_STROKE;
+          ctx.strokeText(a.name, a.x, a.y);
           ctx.fillStyle = `rgba(${NAME_RGB}, ${alpha.toFixed(3)})`;
           ctx.fillText(a.name, a.x, a.y);
-          ctx.shadowBlur = a.persp * 5;
+          ctx.shadowBlur = 5;
           ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.12).toFixed(3)})`;
           ctx.fillText(a.name, a.x, a.y);
           ctx.shadowBlur = 0;
+        } else if (a.z > MID_MIN) {
+          // 中半球：姓名文字 + 微弱光晕，不画阴影与拖影
+          ctx.fillStyle = `rgba(${NAME_RGB}, ${(alpha * 0.9).toFixed(3)})`;
+          ctx.fillText(a.name, a.x, a.y);
+          ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.07).toFixed(3)})`;
+          ctx.fillText(a.name, a.x, a.y);
+        } else {
+          // 后半球：只画姓名文字，绘制量最省
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = `rgba(${NAME_RGB}, ${alpha.toFixed(3)})`;
+          ctx.fillText(a.name, a.x, a.y);
         }
       } else if (showDots && a.seed < dotKeepRatio) {
         const depth = (a.z + 1) / 2;
         const tw = 0.65 + 0.35 * Math.sin(now * 0.0022 + a.seed * 6.283);
         const rad = (1.2 + depth * 2.0) * a.persp;
         const dotA = (0.2 + depth * 0.6) * tw;
-        if (!dotPerf) drawMotionTrail(a.x, a.y, a.prevSx, a.prevSy, dotA * 0.3, rad, false, null);
+        if (!dotPerf && a.z > FRONT_MIN) drawHistoryTrail(a.hist, dotA * 0.3, rad, false, null);
         ctx.beginPath();
         ctx.arc(a.x, a.y, rad, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${DOT_RGB}, ${dotA.toFixed(3)})`;
         ctx.shadowColor = 'rgba(0, 242, 254, 0.9)';
-        ctx.shadowBlur = dotPerf ? 0 : depth * 12;
+        ctx.shadowBlur = (dotPerf || a.z <= FRONT_MIN) ? 0 : depth * 12;
         ctx.fill();
         ctx.beginPath();
         ctx.arc(a.x, a.y, rad * 0.35, 0, Math.PI * 2);
