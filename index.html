@@ -46,6 +46,9 @@ main{flex:1;display:flex;min-height:0}
 #winnerList::-webkit-scrollbar-thumb{background:rgba(0,242,254,.4);border-radius:3px}
 #winnerList::-webkit-scrollbar-track{background:transparent}
 .winner-item{background:linear-gradient(90deg,rgba(0,242,254,.15),rgba(10,20,40,.4));padding:10px;margin-bottom:8px;border-radius:6px;border-left:3px solid #00f2fe;display:flex;justify-content:space-between;font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.3);animation: slideIn 0.3s ease-out;}
+.win-title{font-size:14px;font-weight:700;color:#ffd700;margin:2px 0 10px;letter-spacing:1px}
+.win-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px 5px;justify-items:start;align-items:start}
+.win-cell{font-size:13px;color:#dff2ff;text-align:left;width:100%;min-width:0;padding:4px 3px;border-radius:4px;background:linear-gradient(90deg,rgba(0,242,254,.10),rgba(10,20,40,.25));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 .winner-item span{color:#8fb8e0}
 .winner-item b{color:#ffd700;text-shadow:0 0 8px rgba(255,215,0,.5)}
@@ -965,6 +968,56 @@ if (isJoinMode) {
   let W, H, cx, cy, R, dpr;
   let rotY = 0, speed = 0.2, targetSpeed = 0.2;
   // 旋转轴倾角：让球体明显斜着转(约-28度)，消除两极向中间挤压的观感
+  // ===== 预渲染发光贴图：主循环零 shadowBlur / 零 strokeText，600 人不卡（性能关键） =====
+  const SPRITE = { dpr: 1 };
+  const textSpriteCache = new Map();
+  let DOT_SPRITE = null;
+  function textSprite(name) {
+    let sp = textSpriteCache.get(name);
+    if (sp) return sp;
+    const fs = 20;
+    const S = SPRITE.dpr || 1;
+    const pad = Math.ceil(fs * 0.85);
+    const m = document.createElement('canvas').getContext('2d');
+    m.font = 'bold ' + fs + 'px "Microsoft YaHei"';
+    const tw = Math.max(1, Math.ceil(m.measureText(name).width));
+    const lw = tw + pad * 2, lh = fs + pad * 2;
+    const g = document.createElement('canvas');
+    g.width = Math.ceil(lw * S); g.height = Math.ceil(lh * S);
+    const c = g.getContext('2d');
+    c.setTransform(S, 0, 0, S, 0, 0);
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = 'bold ' + fs + 'px "Microsoft YaHei"';
+    // 淡蓝光影 + 科技感描边 + 主体 + 白芯，一次性烘焙进贴图
+    c.shadowColor = NAME_GLOW; c.shadowBlur = 12;
+    c.lineWidth = 2.4; c.strokeStyle = TECH_STROKE;
+    c.strokeText(name, lw / 2, lh / 2);
+    c.fillStyle = 'rgb(220, 240, 255)';
+    c.fillText(name, lw / 2, lh / 2);
+    c.shadowBlur = 6; c.fillStyle = 'rgba(255, 255, 255, 0.55)';
+    c.fillText(name, lw / 2, lh / 2);
+    c.shadowBlur = 0;
+    sp = { canvas: g, lw: lw, lh: lh, fs: fs };
+    textSpriteCache.set(name, sp);
+    return sp;
+  }
+  function buildDotSprite() {
+    const S = SPRITE.dpr || 1;
+    const d = 48;
+    const g = document.createElement('canvas');
+    g.width = Math.ceil(d * S); g.height = Math.ceil(d * S);
+    const c = g.getContext('2d');
+    c.setTransform(S, 0, 0, S, 0, 0);
+    const r = d / 2;
+    const gr = c.createRadialGradient(r, r, 0, r, r, r);
+    gr.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+    gr.addColorStop(0.18, 'rgba(' + DOT_RGB + ', 0.9)');
+    gr.addColorStop(0.55, 'rgba(' + DOT_RGB + ', 0.35)');
+    gr.addColorStop(1, 'rgba(' + DOT_RGB + ', 0)');
+    c.fillStyle = gr; c.fillRect(0, 0, d, d);
+    DOT_SPRITE = { canvas: g, d: d };
+  }
+
   const AXIS_TILT = -0.49;
   // 透视焦距：调大后近远缩放差变小，边缘人名不再被压向中心，分布更均匀
   const FOCAL = 4.2;
@@ -1113,6 +1166,9 @@ if (isJoinMode) {
     canvas.width = W * dpr;
     canvas.height = H * dpr;
     ctx.scale(dpr, dpr);
+    SPRITE.dpr = dpr;
+    textSpriteCache.clear();
+    buildDotSprite();
     cx = W / 2; cy = H / 2; R = Math.min(W, H) * 0.38;
   }
   window.addEventListener('resize', resize);
@@ -1331,12 +1387,14 @@ if (isJoinMode) {
 
       if (t >= 1 && !f.arrived) {
         f.arrived = true;
-        centerWinners.push({ name: f.name, born: now, expire: now + 3000 });
-        if (f.rec) { winners.push(f.rec); renderWinners(); saveData(); }
+        const queued = centerWinners.length > 0;
+        centerWinners.push({ name: f.name, born: now, expire: now + 3000, rec: f.rec, revealed: false });
         createSparks(cx, cy, '#00f2fe'); 
         createSparks(cx, cy, '#ffd700');
         launchCelebration(cx, cy);
         winBurstT = 0;
+        // 名单写入与中心展示严格同步：仅当此名字正是当前展示的那一个才进入名单，杜绝抢跑
+        if (!queued) revealWinner(centerWinners[0]);
       }
     }
     flyers = flyers.filter(f => !f.arrived);
@@ -1348,6 +1406,7 @@ if (isJoinMode) {
         if (centerWinners.length > 0) {
           centerWinners[0].born = now;
           centerWinners[0].expire = now + 3000;
+          revealWinner(centerWinners[0]);
         } else {
           // 所有动画完成，解除右侧按钮锁定
           state = 'idle';
@@ -1401,7 +1460,7 @@ if (isJoinMode) {
 
     // ===== 分层渲染阈值：按景深 z 分三档，兼顾特效观感与帧率 =====
     const FRONT_MIN = 0, MID_MIN = -0.15;           // 前半球 / 中半球 / 后半球
-    const TRAIL_FRAMES = pool.length > 350 ? 2 : 3; // 人多时拖影帧数减半
+    const TRAIL_FRAMES = pool.length > 500 ? 2 : 3; // 人多时拖影帧数减半
     const TRAIL_ALPHA = 0.3;
     
     for (let i = 0; i < MAX; i++) {
@@ -1431,6 +1490,7 @@ if (isJoinMode) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const dotPerf = MAX > 300;                   // 槽位很多时关光点阴影
+    const perfOff = pool.length > 450;              // 人多时关逐字发光阴影，保帧率
     const showDots = true;                       // 光点常驻：人少铺满、人多逐减
     // 光点随人数主动递减：绑定人数越多，保留显示的空槽光点越少，避免堆积卡顿
     const boundCnt = MAX - freeDotCount(arr);
@@ -1446,50 +1506,38 @@ if (isJoinMode) {
         const depth = (a.z + 1) / 2;
         const alpha = 0.2 + depth * 0.8;
         const size = 10 + a.persp * 9;
-        ctx.font = `bold ${size.toFixed(1)}px "Microsoft YaHei"`;
-        if (a.z > FRONT_MIN) {
-          // 前半球：淡淡彗星拖影 + 淡蓝光影 + 科技感描边 + 发光主体
-          drawHistoryTrail(a.hist, alpha * TRAIL_ALPHA, size, true, a.name);
-          ctx.shadowColor = NAME_GLOW;
-          ctx.shadowBlur = 10;
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = TECH_STROKE;
-          ctx.strokeText(a.name, a.x, a.y);
-          ctx.fillStyle = `rgba(${NAME_RGB}, ${alpha.toFixed(3)})`;
-          ctx.fillText(a.name, a.x, a.y);
-          ctx.shadowBlur = 5;
-          ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.12).toFixed(3)})`;
-          ctx.fillText(a.name, a.x, a.y);
-          ctx.shadowBlur = 0;
-        } else if (a.z > MID_MIN) {
-          // 中半球：姓名文字 + 微弱光晕，不画阴影与拖影
-          ctx.fillStyle = `rgba(${NAME_RGB}, ${(alpha * 0.9).toFixed(3)})`;
-          ctx.fillText(a.name, a.x, a.y);
-          ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.07).toFixed(3)})`;
-          ctx.fillText(a.name, a.x, a.y);
-        } else {
-          // 后半球：只画姓名文字，绘制量最省
-          ctx.shadowBlur = 0;
-          ctx.fillStyle = `rgba(${NAME_RGB}, ${alpha.toFixed(3)})`;
-          ctx.fillText(a.name, a.x, a.y);
-        }
+        // 人名由文字本身发光：每帧在当前位置直接绘制带 shadowBlur 的文字，
+        // 光影是文字自身属性（含球体边缘一圈名字），不再有独立贴图跟随、也不做逐帧重复绘制拖影。
+        const glowOn = (a.z > -0.35) && !perfOff;
+        ctx.globalAlpha = alpha;
+        ctx.font = 'bold ' + size.toFixed(1) + 'px "Microsoft YaHei"';
+        ctx.lineWidth = Math.max(1, size * 0.10);
+        ctx.strokeStyle = TECH_STROKE;
+        ctx.strokeText(a.name, a.x, a.y);
+        if (glowOn) { ctx.shadowColor = NAME_GLOW; ctx.shadowBlur = 12; }
+        ctx.fillStyle = 'rgb(' + NAME_RGB + ')';
+        ctx.fillText(a.name, a.x, a.y);
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
       } else if (showDots && a.seed < dotKeepRatio) {
         const depth = (a.z + 1) / 2;
         const tw = 0.65 + 0.35 * Math.sin(now * 0.0022 + a.seed * 6.283);
         const rad = (1.2 + depth * 2.0) * a.persp;
         const dotA = (0.2 + depth * 0.6) * tw;
-        if (!dotPerf && a.z > FRONT_MIN) drawHistoryTrail(a.hist, dotA * 0.3, rad, false, null);
-        ctx.beginPath();
-        ctx.arc(a.x, a.y, rad, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${DOT_RGB}, ${dotA.toFixed(3)})`;
-        ctx.shadowColor = 'rgba(0, 242, 254, 0.9)';
-        ctx.shadowBlur = (dotPerf || a.z <= FRONT_MIN) ? 0 : depth * 12;
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(a.x, a.y, rad * 0.35, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 255, 255, ${(dotA * 0.5).toFixed(3)})`;
-        ctx.shadowBlur = 0;
-        ctx.fill();
+        if (DOT_SPRITE) {
+          const ds = rad * 6.0;
+          if (!dotPerf && a.z > FRONT_MIN) {
+            const dn = a.hist.length;
+            for (let i = 0; i < dn - 1; i++) {
+              const frac = i / dn; const ta = dotA * 0.3 * frac; if (ta < 0.02) continue;
+              ctx.globalAlpha = ta;
+              ctx.drawImage(DOT_SPRITE.canvas, a.hist[i].x - ds / 2, a.hist[i].y - ds / 2, ds, ds);
+            }
+          }
+          ctx.globalAlpha = dotA;
+          ctx.drawImage(DOT_SPRITE.canvas, a.x - ds / 2, a.y - ds / 2, ds, ds);
+          ctx.globalAlpha = 1;
+        }
       }
     }
 
@@ -1639,14 +1687,8 @@ if (isJoinMode) {
       ctx.shadowColor = '#ffd700';
       ctx.fillText(w.name, 0, 0);
 
-      const ring = 0.5 + 0.5 * Math.sin(now * 0.004);
+      // 中奖名字周围的脉冲圆圈已按反馈移除
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = 'hsla(' + ((now * 0.12) % 360) + ', 100%, 62%, ' + (0.5 + 0.4 * ring).toFixed(3) + ')';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0, 0, 155 + ring * 28, 0, 6.283);
-      ctx.stroke();
-      
       ctx.restore();
     }
   }
@@ -1688,6 +1730,7 @@ if (isJoinMode) {
       $('startBtn').disabled = false;
       $('startBtn').textContent = '开始抽奖';
     }
+    renderWinners();   // 切换/刷新奖项时，名单同步为当前奖项
   }
 
   window.selectPrize = (id) => {
@@ -1696,10 +1739,29 @@ if (isJoinMode) {
     renderPrizeList();
   };
 
+  // 中心展示与名单同步：某名字正在中心揭晓时才写入名单（杜绝抢跑）
+  function revealWinner(w) {
+    if (!w || w.revealed) return;
+    w.revealed = true;
+    if (w.rec) { winners.push(w.rec); saveData(); }
+    renderWinners();
+  }
+
   function renderWinners() {
-    $('winnerList').innerHTML = [...winners].reverse().map(w => 
-      `<div class="winner-item"><span>${w.prize}</span><b>${w.name}</b></div>`
-    ).join('') || '<div style="color:#6f8fb0;text-align:center;font-size:12px;margin-top:20px">暂无中奖记录</div>';
+    const el = $('winnerList');
+    const cp = prizes.find(p => p.id === currentPrizeId);
+    const cpName = cp ? cp.name : '';
+    // 只针对当前中奖项显示；已抽过的奖项人员与信息不再罗列
+    const cur = winners.filter(w => !cpName || w.prize === cpName);
+    if (!cur.length) {
+      el.innerHTML = '<div style="color:#6f8fb0;text-align:center;font-size:12px;margin-top:20px">暂无中奖记录</div>';
+      if (typeof refreshExportBtn === 'function') refreshExportBtn();
+      return;
+    }
+    let html = '<div class="win-title">' + esc(cpName) + '：</div><div class="win-grid">';
+    cur.forEach(w => { html += '<div class="win-cell">' + esc(w.name) + '</div>'; });
+    html += '</div>';
+    el.innerHTML = html;
     if (typeof refreshExportBtn === 'function') refreshExportBtn();
   }
 
